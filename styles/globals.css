@@ -10,6 +10,8 @@
    ============================================================================ */
 
 :root {
+  --font-display: "Fraunces", serif;
+  --font-sans: "Manrope", sans-serif;
   --bg: 250 249 247;
   --surface: 255 255 255;
   --surface-raised: 247 245 242;
