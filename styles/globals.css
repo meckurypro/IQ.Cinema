@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   IQ CINEMA — DESIGN TOKENS
+   Dark: near-black charcoal stage, warm film-gold for value/coins, deep
+   crimson for premium/unlock actions. Light: warm paper, same accent hues
+   deepened slightly for contrast on white.
+   ============================================================================ */
+
+:root {
+  --bg: 250 249 247;
+  --surface: 255 255 255;
+  --surface-raised: 247 245 242;
+  --border: 231 229 225;
+  --text: 20 21 26;
+  --muted: 107 110 118;
+  --gold: 180 128 58;
+  --gold-soft: 245 232 213;
+  --crimson: 150 45 40;
+  --crimson-soft: 250 228 226;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark {
+  --bg: 11 12 16;
+  --surface: 20 22 27;
+  --surface-raised: 27 29 35;
+  --border: 41 44 52;
+  --text: 240 238 233;
+  --muted: 152 154 163;
+  --gold: 196 146 74;
+  --gold-soft: 43 36 24;
+  --crimson: 196 82 74;
+  --crimson-soft: 43 24 24;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Hide scrollbars on horizontal rails but keep them scrollable */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Visible keyboard focus, everywhere */
+:focus-visible {
+  outline: 2px solid rgb(var(--gold));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Coin flip micro-interaction, used on balance updates */
+@keyframes coin-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.coin-pop {
+  animation: coin-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Sheet slide-up for paywall / bottom sheets */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-up {
+  animation: sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: fade-in 200ms ease-out;
+}
