@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, Wallet, Bookmark, User } from "lucide-react";
 import clsx from "clsx";
+import {
+  HomeIcon,
+  ForYouIcon,
+  MyListIcon,
+  RewardsIcon,
+  ProfileIcon,
+} from "./NavIcons";
 
 const items = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/explore", label: "Explore", icon: Compass },
-  { href: "/wallet", label: "Wallet", icon: Wallet },
-  { href: "/library", label: "Library", icon: Bookmark },
-  { href: "/profile", label: "Profile", icon: User },
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/for-you", label: "For You", icon: ForYouIcon },
+  { href: "/library", label: "My List", icon: MyListIcon },
+  { href: "/rewards", label: "Rewards", icon: RewardsIcon },
+  { href: "/profile", label: "Profile", icon: ProfileIcon },
 ];
 
 export function BottomNav() {
@@ -20,24 +26,35 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-surface/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-black/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <ul className="flex items-stretch justify-between px-2">
+      <ul className="flex items-stretch justify-between px-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <li key={href} className="flex-1">
               <Link
                 href={href}
-                className="flex flex-col items-center gap-1 py-2.5 text-[11px] transition-colors"
+                className={clsx(
+                  "flex flex-col items-center gap-1 py-2.5 text-[11px] transition-colors",
+                  "active:bg-pink/10 active:text-pink rounded-md"
+                )}
               >
                 <Icon
-                  size={22}
-                  strokeWidth={active ? 2.4 : 1.8}
-                  className={clsx(active ? "text-gold" : "text-muted")}
+                  width={22}
+                  height={22}
+                  className={clsx(
+                    "transition-colors",
+                    active ? "text-pink" : "text-white/70"
+                  )}
                 />
-                <span className={clsx(active ? "text-text font-medium" : "text-muted")}>
+                <span
+                  className={clsx(
+                    "transition-colors",
+                    active ? "text-pink font-semibold" : "text-white/70"
+                  )}
+                >
                   {label}
                 </span>
               </Link>
