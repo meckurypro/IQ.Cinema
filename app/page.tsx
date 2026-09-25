@@ -1,103 +1,92 @@
-import Image from "next/image";
-import Link from "next/link";
-import { Search, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Rail } from "@/components/home/Rail";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { HomeHeader } from "@/components/home/HomeHeader";
+import { CategoryTabs } from "@/components/home/CategoryTabs";
+import { HeroBanner } from "@/components/home/HeroBanner";
+import { PopularGrid } from "@/components/home/PopularGrid";
 
 export const revalidate = 60;
 
-async function getHomeData() {
+type SearchParams = { tab?: string; genre?: string };
+
+async function getHomeData({ tab, genre }: SearchParams) {
   const supabase = createClient();
+  const activeTab = tab ?? "popular";
 
   const { data: featured } = await supabase
     .from("titles")
-    .select("id, slug, title, poster_url, banner_url, synopsis, total_unique_views, is_exclusive")
+    .select("id, slug, title, poster_url, banner_url, total_unique_views, genre")
     .eq("status", "published")
     .order("total_unique_views", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const { data: trending } = await supabase
+  const { data: exclusive } = await supabase
     .from("titles")
-    .select("id, slug, title, poster_url, total_unique_views, is_exclusive")
+    .select("id, slug, title, poster_url, banner_url")
     .eq("status", "published")
-    .order("total_unique_views", { ascending: false })
-    .limit(10);
-
-  const { data: newReleases } = await supabase
-    .from("titles")
-    .select("id, slug, title, poster_url, total_unique_views, is_exclusive")
-    .eq("status", "published")
+    .eq("is_exclusive", true)
+    .neq("id", featured?.id ?? "")
     .order("published_at", { ascending: false })
-    .limit(10);
+    .limit(1)
+    .maybeSingle();
 
-  return { featured, trending: trending ?? [], newReleases: newReleases ?? [] };
+  let query = supabase
+    .from("titles")
+    .select("id, slug, title, poster_url")
+    .eq("status", "published")
+    .limit(12);
+
+  let heading = "Popular Choices";
+
+  if (activeTab === "new") {
+    query = query.order("published_at", { ascending: false });
+    heading = "New Releases";
+  } else if (activeTab === "ranking") {
+    query = query.order("total_unique_views", { ascending: false });
+    heading = "Top Ranking";
+  } else if (activeTab === "genre" && genre) {
+    query = query.eq("genre", genre).order("total_unique_views", { ascending: false });
+    heading = `${genre} Picks`;
+  } else {
+    query = query.order("total_unique_views", { ascending: false });
+  }
+
+  const { data: gridTitles } = await query;
+
+  return {
+    featured,
+    exclusive,
+    gridTitles: gridTitles ?? [],
+    heading,
+    activeTab,
+  };
 }
 
-export default async function HomePage() {
-  const { featured, trending, newReleases } = await getHomeData();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const { featured, exclusive, gridTitles, heading, activeTab } = await getHomeData(searchParams);
 
   return (
-    <div className="fade-in">
-      <header className="flex items-center justify-between px-4 pt-5">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-text">
-          IQ Cinema
-        </h1>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Link
-            href="/wallet"
-            className="flex h-9 items-center gap-1 rounded-full border border-border bg-surface px-3 text-sm font-semibold text-text"
-          >
-            <Zap size={14} className="fill-gold text-gold" />
-            —
-          </Link>
-          <Link
-            href="/explore"
-            aria-label="Search"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-text"
-          >
-            <Search size={16} />
-          </Link>
-        </div>
-      </header>
+    <div className="fade-in pb-6">
+      <HomeHeader />
 
-      {featured && (
-        <Link href={`/title/${featured.slug}`} className="mt-5 block px-4">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-raised">
-            {featured.banner_url || featured.poster_url ? (
-              <Image
-                src={featured.banner_url ?? featured.poster_url!}
-                alt={featured.title}
-                fill
-                sizes="480px"
-                priority
-                className="object-cover"
-              />
-            ) : null}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-4">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gold">
-                Featured
-              </p>
-              <h2 className="font-display mt-1 text-[26px] font-semibold leading-tight text-white">
-                {featured.title}
-              </h2>
-              {featured.synopsis && (
-                <p className="mt-1.5 line-clamp-2 text-[13px] text-white/75">
-                  {featured.synopsis}
-                </p>
-              )}
-            </div>
-          </div>
-        </Link>
-      )}
+      <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} />
 
-      <Rail heading="Trending now" titles={trending} />
-      <Rail heading="New releases" titles={newReleases} />
+      <HeroBanner
+        featured={
+          featured
+            ? { ...featured, genre_label: featured.genre ?? null }
+            : null
+        }
+        exclusive={exclusive}
+      />
 
-      {!featured && !trending.length && (
+      <PopularGrid heading={heading} titles={gridTitles} />
+
+      {!featured && !gridTitles.length && (
         <div className="mt-16 px-6 text-center">
           <p className="font-display text-lg text-text">Nothing published yet</p>
           <p className="mt-1.5 text-sm text-muted">
