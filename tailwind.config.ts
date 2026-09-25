@@ -16,6 +16,8 @@ const config: Config = {
         "gold-soft": "rgb(var(--gold-soft) / <alpha-value>)",
         crimson: "rgb(var(--crimson) / <alpha-value>)",
         "crimson-soft": "rgb(var(--crimson-soft) / <alpha-value>)",
+        pink: "rgb(var(--pink) / <alpha-value>)",
+        "pink-soft": "rgb(var(--pink-soft) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-display)"],
