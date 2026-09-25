@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="24" height="24"
+     viewBox="0 0 24 24"
+     fill="none">
+  <title>Profile</title>
+
+  <!-- Premium Profile icon: distinctive portrait within an open frame -->
+  <path
+    d="M5.25 19.25C6.38 15.98 8.65 14.25 12 14.25C15.35 14.25 17.62 15.98 18.75 19.25"
+    stroke="currentColor"
+    stroke-width="1.7"
+    stroke-linecap="round"/>
+
+  <path
+    d="M12 11.9C14.07 11.9 15.75 10.22 15.75 8.15C15.75 6.08 14.07 4.4 12 4.4C9.93 4.4 8.25 6.08 8.25 8.15C8.25 10.22 9.93 11.9 12 11.9Z"
+    stroke="currentColor"
+    stroke-width="1.7"/>
+
+  <!-- Subtle open-frame signature -->
+  <path
+    d="M4.25 7.25V5.75C4.25 4.92 4.92 4.25 5.75 4.25H7.25"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+
+  <path
+    d="M19.75 16.75V18.25C19.75 19.08 19.08 19.75 18.25 19.75H16.75"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+</svg>

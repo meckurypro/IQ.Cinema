@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="24" height="24"
+     viewBox="0 0 24 24"
+     fill="none">
+  <title>My List</title>
+
+  <!-- Premium My List icon: refined collection/folder mark -->
+  <path
+    d="M4.25 7.25C4.25 6.42 4.92 5.75 5.75 5.75H9.35L10.85 7.35H18.25C19.08 7.35 19.75 8.02 19.75 8.85V17.75C19.75 18.58 19.08 19.25 18.25 19.25H5.75C4.92 19.25 4.25 18.58 4.25 17.75V7.25Z"
+    stroke="currentColor"
+    stroke-width="1.7"
+    stroke-linejoin="round"/>
+
+  <!-- Curated-list accent -->
+  <path
+    d="M8 11.35H16"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+
+  <path
+    d="M8 14.65H13.5"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+
+  <!-- Small signature mark -->
+  <path
+    d="M16.15 14.55L16.85 15.25L18.05 13.95"
+    stroke="currentColor"
+    stroke-width="1.35"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>

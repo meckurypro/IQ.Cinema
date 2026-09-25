@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="24" height="24"
+     viewBox="0 0 24 24"
+     fill="none">
+  <title>For You</title>
+
+  <!-- Premium For You icon: a refined discovery/card mark -->
+  <rect
+    x="4.25" y="3.75"
+    width="15.5" height="16.5"
+    rx="3.25"
+    stroke="currentColor"
+    stroke-width="1.7"/>
+
+  <!-- Distinctive discovery spark -->
+  <path
+    d="M12 7.15L12.62 8.88L14.35 9.5L12.62 10.12L12 11.85L11.38 10.12L9.65 9.5L11.38 8.88L12 7.15Z"
+    fill="currentColor"/>
+
+  <!-- Curated content lines -->
+  <path
+    d="M7.5 14.25H16.5"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+
+  <path
+    d="M7.5 17.25H13.5"
+    stroke="currentColor"
+    stroke-width="1.55"
+    stroke-linecap="round"/>
+</svg>

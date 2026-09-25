@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="24" height="24"
+     viewBox="0 0 24 24"
+     fill="none">
+  <title>Home</title>
+
+  <!-- Premium Home icon: clean geometric silhouette with a distinctive inset doorway -->
+  <path
+    d="M3.75 10.55L11.02 4.42C11.58 3.95 12.42 3.95 12.98 4.42L20.25 10.55"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <path
+    d="M5.25 9.65V18.35C5.25 19.18 5.92 19.85 6.75 19.85H17.25C18.08 19.85 18.75 19.18 18.75 18.35V9.65"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <path
+    d="M9.15 19.75V15.45C9.15 14.98 9.53 14.6 10 14.6H14C14.47 14.6 14.85 14.98 14.85 15.45V19.75"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Subtle architectural accent -->
+  <path
+    d="M8.05 8.85H8.06"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"/>
+</svg>
