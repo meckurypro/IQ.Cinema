@@ -22,6 +22,8 @@
   --gold-soft: 245 232 213;
   --crimson: 150 45 40;
   --crimson-soft: 250 228 226;
+  --pink: 255 42 105;
+  --pink-soft: 255 42 105;
 
   --font-display: "Fraunces", ui-serif, Georgia, serif;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
@@ -38,6 +40,8 @@
   --gold-soft: 43 36 24;
   --crimson: 196 82 74;
   --crimson-soft: 43 24 24;
+  --pink: 255 42 105;
+  --pink-soft: 255 42 105;
 }
 
 * {
