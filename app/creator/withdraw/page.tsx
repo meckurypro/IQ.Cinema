@@ -1,3 +1,5 @@
+// app/creator/withdraw/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +72,7 @@ export default function WithdrawPage() {
         <Link href="/creator/dashboard" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-xl font-semibold text-text">Request withdrawal</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">Request withdrawal</h1>
       </div>
 
       <p className="mt-3 text-[13px] text-muted">

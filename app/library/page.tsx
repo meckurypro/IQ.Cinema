@@ -1,3 +1,5 @@
+// app/library/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default function LibraryPage() {
 
   return (
     <div className="fade-in px-4 pt-5">
-      <h1 className="font-display text-xl font-semibold text-text">Library</h1>
+      <h1 className="font-display text-2xl font-semibold text-text">Library</h1>
 
       <div className="mt-4 flex gap-5 border-b border-border">
         {(["list", "history"] as Tab[]).map((t) => (
@@ -59,7 +61,7 @@ export default function LibraryPage() {
             onClick={() => setTab(t)}
             className={clsx(
               "border-b-2 pb-2.5 text-[14px] font-medium transition-colors",
-              tab === t ? "border-gold text-text" : "border-transparent text-muted"
+              tab === t ? "border-pink text-pink" : "border-transparent text-muted"
             )}
           >
             {t === "list" ? "My List" : "History"}

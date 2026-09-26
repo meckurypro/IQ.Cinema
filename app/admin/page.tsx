@@ -1,3 +1,5 @@
+// app/admin/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +100,7 @@ export default function AdminPage() {
 
   return (
     <div className="fade-in px-4 pt-5 pb-10">
-      <h1 className="font-display text-xl font-semibold text-text">Admin</h1>
+      <h1 className="font-display text-2xl font-semibold text-text">Admin</h1>
 
       <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto border-b border-border">
         {tabs.map((t) => (

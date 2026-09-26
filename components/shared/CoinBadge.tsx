@@ -1,3 +1,5 @@
+// components/shared/CoinBadge.tsx
+
 "use client";
 
 import { Zap } from "lucide-react";

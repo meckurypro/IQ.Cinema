@@ -1,3 +1,5 @@
+// app/creator/upload/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -124,7 +126,7 @@ export default function UploadPage() {
         <Link href="/creator/dashboard" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-xl font-semibold text-text">
+        <h1 className="font-display text-2xl font-semibold text-text">
           {step === "title" ? "New title" : "Add episode"}
         </h1>
       </div>
@@ -139,7 +141,7 @@ export default function UploadPage() {
                 onClick={() => setContentType(ct)}
                 className={`h-10 flex-1 rounded-md border text-[13px] font-medium capitalize transition-colors ${
                   contentType === ct
-                    ? "border-gold bg-gold-soft text-gold"
+                    ? "border-pink bg-pink/10 text-pink"
                     : "border-border bg-surface text-muted"
                 }`}
               >

@@ -1,3 +1,5 @@
+// app/watch/[episodeId]/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -161,7 +163,7 @@ export default function WatchPage() {
             </p>
           </div>
           {error && <p className="text-sm text-crimson">{error}</p>}
-          <Button variant="gold" size="lg" disabled={unlocking} onClick={handleUnlock}>
+          <Button variant="primary" size="lg" disabled={unlocking} onClick={handleUnlock}>
             <Zap size={16} className="fill-current" />
             Unlock for {episode.unlock_cost_coins ?? 30} coins
           </Button>

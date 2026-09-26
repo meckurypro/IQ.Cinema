@@ -1,3 +1,5 @@
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ThemeScript } from "@/components/shared/ThemeScript";
