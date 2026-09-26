@@ -15,7 +15,7 @@ const items = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/for-you", label: "For You", icon: ForYouIcon },
   { href: "/library", label: "My List", icon: MyListIcon },
-  { href: "/rewards", label: "Rewards", icon: RewardsIcon },
+  { href: "/wallet", label: "Rewards", icon: RewardsIcon },
   { href: "/profile", label: "Profile", icon: ProfileIcon },
 ] as const;
 
@@ -32,7 +32,7 @@ export function BottomNav() {
       <ul className="flex items-stretch justify-between px-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          const isRewards = href === "/rewards";
+          const isRewards = label === "Rewards";
 
           return (
             <li key={href} className="flex-1">
