@@ -74,7 +74,7 @@ export function CategoryTabs({
             isGenreActive ? "text-text" : "text-white/55"
           )}
         >
-          {isGenreActive && activeGenre ? activeGenre : "Genres"}
+          Genres
           <ChevronDown size={17} strokeWidth={3} />
         </button>
 
