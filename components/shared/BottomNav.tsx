@@ -34,7 +34,6 @@ export function BottomNav() {
       <ul className="flex items-stretch justify-between px-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          const isRewards = href === "/rewards";
 
           return (
             <li key={href} className="flex-1">
@@ -45,15 +44,12 @@ export function BottomNav() {
                 <Icon
                   width={28}
                   height={28}
-                  className={clsx(
-                    "transition-colors",
-                    isRewards ? "text-gold" : active ? "text-pink" : "text-white/85"
-                  )}
+                  className={clsx("transition-colors", active ? "text-pink" : "text-white/85")}
                 />
                 <span
                   className={clsx(
                     "font-bold tracking-tight transition-colors",
-                    isRewards ? "text-gold" : active ? "text-pink" : "text-white/85"
+                    active ? "text-pink" : "text-white/85"
                   )}
                 >
                   {label}

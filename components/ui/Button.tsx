@@ -1,3 +1,5 @@
+// components/ui/Button.tsx
+
 "use client";
 
 import { ButtonHTMLAttributes, forwardRef } from "react";
@@ -7,7 +9,10 @@ type Variant = "primary" | "secondary" | "ghost" | "gold";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-crimson text-white hover:brightness-110 active:brightness-95",
+  // Brand primary: pink → crimson, the same red/pink pairing used for the
+  // "Exclusive" and "Hot" badges on the home page, applied to every CTA.
+  primary:
+    "bg-gradient-to-r from-pink to-crimson text-white hover:brightness-110 active:brightness-95",
   secondary: "bg-surface-raised text-text hover:bg-border/60",
   ghost: "bg-transparent text-text hover:bg-surface-raised",
   gold: "bg-gold text-[rgb(20_16_8)] hover:brightness-105 active:brightness-95",

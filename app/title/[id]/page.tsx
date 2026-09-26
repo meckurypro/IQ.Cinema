@@ -1,3 +1,5 @@
+// app/title/[id]/page.tsx
+
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -71,7 +73,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         <div className="mt-4 flex gap-2">
           <Link
             href={episodes[0] ? `/watch/${episodes[0].id}` : "#"}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-crimson text-[15px] font-semibold text-white"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white"
           >
             <Play size={16} className="fill-white" />
             Watch now

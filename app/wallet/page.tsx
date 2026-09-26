@@ -1,3 +1,5 @@
+// app/wallet/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +62,7 @@ export default function WalletPage() {
         <Link href="/" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-xl font-semibold text-text">Wallet</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">Wallet</h1>
       </div>
 
       <div className="mt-4 rounded-lg border border-border bg-surface p-4 text-center">

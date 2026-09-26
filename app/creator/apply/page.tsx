@@ -1,3 +1,5 @@
+// app/creator/apply/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +72,7 @@ export default function CreatorApplyPage() {
         <Link href="/profile" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-xl font-semibold text-text">Become a creator</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">Become a creator</h1>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-muted">
         Tell us about what you make. Approved creators can upload titles; earnings unlock fully

@@ -1,3 +1,5 @@
+// app/creator/dashboard/page.tsx
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +37,7 @@ function ProgressRow({ label, value, target }: { label: string; value: number; t
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-raised">
-        <div className="h-full rounded-full bg-gold transition-all" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-pink transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -87,7 +89,7 @@ export default function CreatorDashboardPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-xl font-semibold text-text">Creator dashboard</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">Creator dashboard</h1>
         <Link href="/creator/upload">
           <Button size="sm">
             <Plus size={15} /> Upload
@@ -112,7 +114,7 @@ export default function CreatorDashboardPage() {
 
       {isPartner ? (
         <Link href="/creator/withdraw">
-          <Button variant="gold" className="mt-3 w-full">
+          <Button variant="primary" className="mt-3 w-full">
             Request withdrawal
           </Button>
         </Link>
