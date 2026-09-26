@@ -38,7 +38,7 @@ async function getHomeData({ tab, genre }: SearchParams) {
   // These three don't depend on each other, so run them concurrently instead
   // of waiting on each round trip in turn — this is the main win for
   // perceived speed on every tab/genre switch.
-  const [{ data: featured }, { data: gridTitles }, { data: genreRows }] = await Promise.all([
+  const [{ data: featured }, { data: gridTitles }, { data: usedGenreRows }] = await Promise.all([
     supabase
       .from("titles")
       .select("id, slug, title, poster_url, banner_url, total_unique_views, genre")
@@ -47,8 +47,12 @@ async function getHomeData({ tab, genre }: SearchParams) {
       .limit(1)
       .maybeSingle(),
     gridQuery,
-    supabase.from("genres").select("name").order("name"),
+    // Only genres that a creator has actually published a title under —
+    // not the full catalog in the `genres` table.
+    supabase.from("titles").select("genre").eq("status", "published").not("genre", "is", null),
   ]);
+
+  const genres = Array.from(new Set((usedGenreRows ?? []).map((r) => r.genre))).sort() as string[];
 
   // This one genuinely depends on featured.id, so it has to follow —
   // but it's now the only sequential hop instead of one of four.
@@ -66,7 +70,7 @@ async function getHomeData({ tab, genre }: SearchParams) {
     featured,
     exclusive,
     gridTitles: gridTitles ?? [],
-    genres: (genreRows ?? []).map((g) => g.name),
+    genres,
     heading,
     activeTab,
   };
