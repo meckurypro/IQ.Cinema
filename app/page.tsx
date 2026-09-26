@@ -14,14 +14,44 @@ async function getHomeData({ tab, genre }: SearchParams) {
   const supabase = createClient();
   const activeTab = tab ?? "popular";
 
-  const { data: featured } = await supabase
+  let gridQuery = supabase
     .from("titles")
-    .select("id, slug, title, poster_url, banner_url, total_unique_views, genre")
+    .select("id, slug, title, poster_url")
     .eq("status", "published")
-    .order("total_unique_views", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(12);
 
+  let heading = "Popular Choices";
+
+  if (activeTab === "new") {
+    gridQuery = gridQuery.order("published_at", { ascending: false });
+    heading = "New Releases";
+  } else if (activeTab === "ranking") {
+    gridQuery = gridQuery.order("total_unique_views", { ascending: false });
+    heading = "Top Ranking";
+  } else if (activeTab === "genre" && genre) {
+    gridQuery = gridQuery.eq("genre", genre).order("total_unique_views", { ascending: false });
+    heading = `${genre} Picks`;
+  } else {
+    gridQuery = gridQuery.order("total_unique_views", { ascending: false });
+  }
+
+  // These three don't depend on each other, so run them concurrently instead
+  // of waiting on each round trip in turn — this is the main win for
+  // perceived speed on every tab/genre switch.
+  const [{ data: featured }, { data: gridTitles }, { data: genreRows }] = await Promise.all([
+    supabase
+      .from("titles")
+      .select("id, slug, title, poster_url, banner_url, total_unique_views, genre")
+      .eq("status", "published")
+      .order("total_unique_views", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    gridQuery,
+    supabase.from("genres").select("name").order("name"),
+  ]);
+
+  // This one genuinely depends on featured.id, so it has to follow —
+  // but it's now the only sequential hop instead of one of four.
   const { data: exclusive } = await supabase
     .from("titles")
     .select("id, slug, title, poster_url, banner_url")
@@ -31,31 +61,6 @@ async function getHomeData({ tab, genre }: SearchParams) {
     .order("published_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
-  let query = supabase
-    .from("titles")
-    .select("id, slug, title, poster_url")
-    .eq("status", "published")
-    .limit(12);
-
-  let heading = "Popular Choices";
-
-  if (activeTab === "new") {
-    query = query.order("published_at", { ascending: false });
-    heading = "New Releases";
-  } else if (activeTab === "ranking") {
-    query = query.order("total_unique_views", { ascending: false });
-    heading = "Top Ranking";
-  } else if (activeTab === "genre" && genre) {
-    query = query.eq("genre", genre).order("total_unique_views", { ascending: false });
-    heading = `${genre} Picks`;
-  } else {
-    query = query.order("total_unique_views", { ascending: false });
-  }
-
-  const { data: gridTitles } = await query;
-
-  const { data: genreRows } = await supabase.from("genres").select("name").order("name");
 
   return {
     featured,
