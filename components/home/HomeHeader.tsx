@@ -34,7 +34,7 @@ export function HomeHeader() {
         alt="IQ Cinema"
         width={38}
         height={38}
-        className="shrink-0 rounded-full"
+        className="shrink-0"
         priority
       />
     </header>
