@@ -28,8 +28,8 @@ export function CategoryTabs({
             key={key}
             href={key === "popular" ? "/" : `/?tab=${key}`}
             className={clsx(
-              "text-[15px] font-semibold transition-colors",
-              active ? "text-pink" : "text-muted"
+              "text-[16px] font-extrabold uppercase tracking-wide transition-colors",
+              active ? "text-text" : "text-white/55"
             )}
           >
             {label}
@@ -40,12 +40,12 @@ export function CategoryTabs({
       <details className="group relative ml-auto">
         <summary
           className={clsx(
-            "flex cursor-pointer list-none items-center gap-1 text-[15px] font-semibold transition-colors",
-            isGenreActive ? "text-pink" : "text-muted"
+            "flex cursor-pointer list-none items-center gap-1 text-[16px] font-extrabold uppercase tracking-wide transition-colors",
+            isGenreActive ? "text-text" : "text-white/55"
           )}
         >
           {isGenreActive && activeGenre ? activeGenre : "Genres"}
-          <ChevronDown size={16} />
+          <ChevronDown size={17} strokeWidth={3} />
         </summary>
 
         <div className="absolute right-0 top-full z-10 mt-2 w-40 overflow-hidden rounded-md border border-border bg-surface shadow-card">
