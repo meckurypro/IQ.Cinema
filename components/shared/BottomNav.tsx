@@ -1,3 +1,5 @@
+// components/shared/BottomNav.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -15,7 +17,7 @@ const items = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/for-you", label: "For You", icon: ForYouIcon },
   { href: "/library", label: "My List", icon: MyListIcon },
-  { href: "/wallet", label: "Rewards", icon: RewardsIcon },
+  { href: "/rewards", label: "Rewards", icon: RewardsIcon },
   { href: "/profile", label: "Profile", icon: ProfileIcon },
 ] as const;
 
@@ -32,18 +34,17 @@ export function BottomNav() {
       <ul className="flex items-stretch justify-between px-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          const isRewards = label === "Rewards";
+          const isRewards = href === "/rewards";
 
           return (
             <li key={href} className="flex-1">
               <Link
                 href={href}
-                className="flex flex-col items-center gap-1 rounded-md py-2.5 text-[11.5px] transition-colors active:bg-pink/10"
+                className="flex flex-col items-center gap-0.5 rounded-md py-2 text-[11.5px] transition-colors active:bg-pink/10"
               >
                 <Icon
-                  width={25}
-                  height={25}
-                  filled={active}
+                  width={28}
+                  height={28}
                   className={clsx(
                     "transition-colors",
                     isRewards ? "text-gold" : active ? "text-pink" : "text-white/85"
