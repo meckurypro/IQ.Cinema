@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Search, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { Search } from "lucide-react";
 
 export function HomeHeader() {
   const router = useRouter();
@@ -29,13 +29,14 @@ export function HomeHeader() {
         </label>
       </form>
 
-      <Link
-        href="/wallet"
-        className="flex h-10 shrink-0 items-center gap-1 rounded-full border border-gold/40 bg-gold-soft px-3 text-xs font-semibold text-gold"
-      >
-        <Sparkles size={13} className="fill-gold" />
-        VIP
-      </Link>
+      <Image
+        src="/IQCinemaIcon.png"
+        alt="IQ Cinema"
+        width={38}
+        height={38}
+        className="shrink-0 rounded-full"
+        priority
+      />
     </header>
   );
 }
