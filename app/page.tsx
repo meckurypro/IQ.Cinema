@@ -1,3 +1,5 @@
+// app/page.tsx
+
 import { createClient } from "@/lib/supabase/server";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { CategoryTabs } from "@/components/home/CategoryTabs";
@@ -53,10 +55,13 @@ async function getHomeData({ tab, genre }: SearchParams) {
 
   const { data: gridTitles } = await query;
 
+  const { data: genreRows } = await supabase.from("genres").select("name").order("name");
+
   return {
     featured,
     exclusive,
     gridTitles: gridTitles ?? [],
+    genres: (genreRows ?? []).map((g) => g.name),
     heading,
     activeTab,
   };
@@ -67,13 +72,15 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { featured, exclusive, gridTitles, heading, activeTab } = await getHomeData(searchParams);
+  const { featured, exclusive, gridTitles, genres, heading, activeTab } = await getHomeData(
+    searchParams
+  );
 
   return (
     <div className="fade-in pb-6">
       <HomeHeader />
 
-      <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} />
+      <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} genres={genres} />
 
       <HeroBanner
         featured={
