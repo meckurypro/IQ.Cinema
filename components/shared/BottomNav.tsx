@@ -17,7 +17,7 @@ const items = [
   { href: "/library", label: "My List", icon: MyListIcon },
   { href: "/rewards", label: "Rewards", icon: RewardsIcon },
   { href: "/profile", label: "Profile", icon: ProfileIcon },
-];
+] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -32,27 +32,27 @@ export function BottomNav() {
       <ul className="flex items-stretch justify-between px-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const isRewards = href === "/rewards";
+
           return (
             <li key={href} className="flex-1">
               <Link
                 href={href}
-                className={clsx(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] transition-colors",
-                  "active:bg-pink/10 active:text-pink rounded-md"
-                )}
+                className="flex flex-col items-center gap-1 rounded-md py-2.5 text-[11.5px] transition-colors active:bg-pink/10"
               >
                 <Icon
-                  width={22}
-                  height={22}
+                  width={25}
+                  height={25}
+                  filled={active}
                   className={clsx(
                     "transition-colors",
-                    active ? "text-pink" : "text-white/70"
+                    isRewards ? "text-gold" : active ? "text-pink" : "text-white/85"
                   )}
                 />
                 <span
                   className={clsx(
-                    "transition-colors",
-                    active ? "text-pink font-semibold" : "text-white/70"
+                    "font-bold tracking-tight transition-colors",
+                    isRewards ? "text-gold" : active ? "text-pink" : "text-white/85"
                   )}
                 >
                   {label}
