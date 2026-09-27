@@ -306,18 +306,20 @@ export default function AdminPage() {
                   )}
                 </div>
                 <button
+                  type="button"
                   role="switch"
                   aria-checked={f.enabled}
+                  aria-label={f.label}
                   onClick={() => toggleFlag(f.key, !f.enabled)}
                   className={clsx(
-                    "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                    f.enabled ? "bg-gold" : "bg-border"
+                    "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors",
+                    f.enabled ? "bg-pink" : "bg-border"
                   )}
                 >
                   <span
                     className={clsx(
-                      "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-                      f.enabled ? "translate-x-5" : "translate-x-0.5"
+                      "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                      f.enabled ? "translate-x-5" : "translate-x-0"
                     )}
                   />
                 </button>
