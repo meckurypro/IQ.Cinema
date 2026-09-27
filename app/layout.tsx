@@ -20,6 +20,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Manrope:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Tints the browser's own chrome (status bar / toolbar area on
+            Android, and the equivalent on other mobile browsers) to match
+            the app's theme. Content is kept in sync with the `dark` class
+            by ThemeScript (first paint) and useTheme (live toggles) below —
+            it has to be JS-driven, not a static/media-query meta tag,
+            because the user's manual light/dark choice can override the
+            OS-level color scheme. */}
+        <meta id="theme-color-meta" name="theme-color" content="#faf9f7" />
         <ThemeScript />
       </head>
       <body className="font-sans">
