@@ -1,6 +1,8 @@
+// hooks/useAuth.tsx
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,9 +20,34 @@ export type Profile = {
   is_admin: boolean;
 };
 
+type AuthState = {
+  user: User | null;
+  profile: Profile | null;
+  loading: boolean;
+};
+
+const AuthContext = createContext<AuthState | undefined>(undefined);
+
 const supabase = createClient();
 
-export function useAuth() {
+// This used to be plain logic inside the useAuth() hook itself, which meant
+// every component that called useAuth() ran its own independent copy of
+// this effect. On /creator/dashboard, both app/creator/layout.tsx and
+// app/creator/dashboard/page.tsx call useAuth() and mount at the same time,
+// so two separate effect instances each tried to open a realtime channel
+// named `profile-live-${user.id}` — identical topic, same user.
+//
+// supabase.channel(topic) is a lookup, not a constructor: the second
+// caller got back the SAME already-subscribed channel the first caller
+// created, and calling `.on(...)` on a channel that's already had
+// `.subscribe()` called on it throws:
+//   "cannot add `postgres_changes` callbacks ... after `subscribe()`"
+// — which was the exact client-side exception crashing this page.
+//
+// Moving all of this into a single provider mounted once in app/layout.tsx
+// means there's exactly one auth fetch, one profile fetch, and one realtime
+// channel per session, no matter how many components consume useAuth().
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,11 +60,12 @@ export function useAuth() {
     let requestId = 0;
 
     async function loadProfile(userId: string, thisRequest: number) {
-      const { data: p } = await supabase
+      const { data: p, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
+      if (error) console.error("Failed to load profile:", error.message);
       if (mounted && thisRequest === requestId) setProfile(p as Profile);
     }
 
@@ -70,7 +98,8 @@ export function useAuth() {
       sub.subscription.unsubscribe();
     };
     // supabase is a module-level singleton (stable identity), so this only
-    // needs to run once per mount.
+    // needs to run once per mount — and this provider itself only mounts
+    // once, at the root.
   }, []);
 
   // Keep `profile` live: an admin can change someone's tier/staff/admin
@@ -97,5 +126,16 @@ export function useAuth() {
     };
   }, [user?.id]);
 
-  return { user, profile, loading };
+  return <AuthContext.Provider value={{ user, profile, loading }}>{children}</AuthContext.Provider>;
+}
+
+// Same signature as before — every existing `const { user, profile } =
+// useAuth();` call site keeps working with no changes needed beyond the
+// AuthProvider now wrapping the app in app/layout.tsx.
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth() must be used within an <AuthProvider> (see app/layout.tsx)");
+  }
+  return ctx;
 }
