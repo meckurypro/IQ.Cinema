@@ -56,14 +56,15 @@ export async function middleware(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, creator_status")
+      .select("role, creator_status, is_admin")
       .eq("id", user.id)
       .single();
 
-    // Admin dashboard: logged in but not an admin (viewer/creator/partner/
-    // staff all included) -> home.
+    // Admin dashboard: logged in but not an admin -> home. is_admin is now
+    // independent of content tier, so an admin who's also a plain viewer
+    // (or a creator, or a partner) still gets in.
     if (pathname.startsWith("/admin")) {
-      if (profile?.role !== "admin") {
+      if (!profile?.is_admin) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         url.search = "";
@@ -82,7 +83,7 @@ export async function middleware(request: NextRequest) {
     // non-partner creator gets bounced back to the dashboard, where the
     // Partner Program progress card lives.
     if (pathname === "/creator/withdraw") {
-      const isPartnerOrAdmin = profile?.role === "admin" || profile?.creator_status === "partner";
+      const isPartnerOrAdmin = profile?.is_admin || profile?.creator_status === "partner";
       if (!isPartnerOrAdmin) {
         const url = request.nextUrl.clone();
         url.pathname = "/creator/dashboard";
@@ -96,7 +97,7 @@ export async function middleware(request: NextRequest) {
     // requires an actual creator or admin account — a plain viewer gets
     // routed to the application page instead of home, since that's the
     // actual next step for them.
-    const isCreatorOrAdmin = profile?.role === "creator" || profile?.role === "admin";
+    const isCreatorOrAdmin = profile?.role === "creator" || profile?.is_admin;
     if (!isCreatorOrAdmin) {
       const url = request.nextUrl.clone();
       url.pathname = "/creator/apply";
