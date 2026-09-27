@@ -73,5 +73,29 @@ export function useAuth() {
     // needs to run once per mount.
   }, []);
 
+  // Keep `profile` live: an admin can change someone's tier/staff/admin
+  // flags from a different browser while this user is mid-session, and
+  // pages that gate on `profile` (creator layout, admin dashboard) need to
+  // react immediately rather than waiting for the next navigation, which is
+  // the only time middleware re-checks.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`profile-live-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+        (payload) => {
+          setProfile((prev) => ({ ...(prev ?? ({} as Profile)), ...(payload.new as Partial<Profile>) }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   return { user, profile, loading };
 }
