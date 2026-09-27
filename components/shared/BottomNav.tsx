@@ -28,7 +28,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-black/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-surface/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <ul className="flex items-stretch justify-between px-1">
@@ -44,12 +44,12 @@ export function BottomNav() {
                 <Icon
                   width={28}
                   height={28}
-                  className={clsx("transition-colors", active ? "text-pink" : "text-white/85")}
+                  className={clsx("transition-colors", active ? "text-pink" : "text-muted")}
                 />
                 <span
                   className={clsx(
                     "font-bold tracking-tight transition-colors",
-                    active ? "text-pink" : "text-white/85"
+                    active ? "text-pink" : "text-muted"
                   )}
                 >
                   {label}

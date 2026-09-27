@@ -14,7 +14,14 @@ export function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const apply = (isDark: boolean) => root.classList.toggle("dark", isDark);
+    const apply = (isDark: boolean) => {
+      root.classList.toggle("dark", isDark);
+      // Keep the browser's own chrome (status bar / toolbar) in sync — same
+      // hex values as --bg in globals.css and in ThemeScript's first-paint
+      // version of this.
+      const meta = document.getElementById("theme-color-meta");
+      meta?.setAttribute("content", isDark ? "#0b0c10" : "#faf9f7");
+    };
 
     if (mode === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");

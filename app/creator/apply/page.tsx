@@ -4,13 +4,14 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
+import clsx from "clsx";
 
 export default function CreatorApplyPage() {
   const { user } = useAuth();
@@ -23,6 +24,15 @@ export default function CreatorApplyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [genres, setGenres] = useState<string[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("genres")
+      .select("name")
+      .order("name")
+      .then(({ data }) => setGenres((data ?? []).map((g) => g.name)));
+  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,12 +98,29 @@ export default function CreatorApplyPage() {
           rows={4}
           className="w-full rounded-md border border-border bg-surface px-4 py-3 text-[14px] text-text placeholder:text-muted"
         />
-        <input
-          placeholder="Primary genre"
-          value={primaryGenre}
-          onChange={(e) => setPrimaryGenre(e.target.value)}
-          className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
-        />
+        <div className="relative">
+          <select
+            value={primaryGenre}
+            onChange={(e) => setPrimaryGenre(e.target.value)}
+            className={clsx(
+              "h-12 w-full appearance-none rounded-md border border-border bg-surface px-4 pr-10 text-[14px]",
+              primaryGenre ? "text-text" : "text-muted"
+            )}
+          >
+            <option value="" disabled>
+              Primary genre
+            </option>
+            {genres.map((genre) => (
+              <option key={genre} value={genre}>
+                {genre}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={18}
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted"
+          />
+        </div>
         <input
           placeholder="Portfolio link (optional)"
           value={portfolioUrl}
