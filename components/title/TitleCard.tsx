@@ -26,7 +26,7 @@ export function TitleCard({ title, size = "md" }: { title: TitleCardData; size?:
 
   return (
     <Link href={`/title/${title.slug}`} className={clsx("shrink-0 group", width)}>
-      <div className="relative aspect-[3/4] overflow-hidden rounded-md bg-surface-raised">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-md bg-surface-raised">
         {title.poster_url ? (
           <Image
             src={title.poster_url}

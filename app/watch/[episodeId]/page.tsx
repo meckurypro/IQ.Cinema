@@ -40,11 +40,19 @@ export default function WatchPage() {
   const supabase = createClient();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
+  const [freeCount, setFreeCount] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastReportedRef = useRef(0);
+
+  // Free-by-count episodes are already granted for free by the
+  // unlock_episode RPC itself — this is just so the UI can show that up
+  // front instead of a "Unlock for N coins" prompt that, when clicked,
+  // turns out to charge nothing.
+  const isFreeEpisode =
+    episode != null && freeCount != null && episode.episode_number <= freeCount;
 
   useEffect(() => {
     async function load() {
@@ -54,6 +62,14 @@ export default function WatchPage() {
         .eq("id", episodeId)
         .single();
       setEpisode(ep as EpisodeData);
+
+      if (ep) {
+        const [{ data: t }, { data: settings }] = await Promise.all([
+          supabase.from("titles").select("free_episode_count").eq("id", ep.title_id).single(),
+          supabase.from("platform_settings").select("default_free_episodes").single(),
+        ]);
+        setFreeCount(t?.free_episode_count ?? settings?.default_free_episodes ?? 4);
+      }
 
       if (user) {
         const { data: unlock } = await supabase
@@ -69,6 +85,17 @@ export default function WatchPage() {
     }
     if (episodeId) load();
   }, [episodeId, user, supabase]);
+
+  // Free episodes need no coin/subscription decision from the viewer — grant
+  // them automatically the moment we know both that it's free and that the
+  // viewer isn't already unlocked, instead of showing a paywall screen for
+  // something that was never going to cost anything.
+  useEffect(() => {
+    if (isFreeEpisode && user && unlocked === false && !unlocking) {
+      handleUnlock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFreeEpisode, user, unlocked]);
 
   // Resolve a short-lived signed URL only once the episode is confirmed unlocked
   // — the 'videos' bucket is private, so there's no public URL to leak.
@@ -145,6 +172,27 @@ export default function WatchPage() {
           onTimeUpdate={reportProgress}
           onEnded={() => episode.duration_seconds && reportProgress(episode.duration_seconds)}
         />
+      ) : isFreeEpisode ? (
+        user ? (
+          // Free episodes are auto-unlocked as soon as we know they're free
+          // (see the effect above) — this only shows for the brief moment
+          // that grant takes, never a paywall.
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-white/60">Loading…</p>
+          </div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+            <div>
+              <p className="font-display text-lg font-semibold text-white">
+                Episode {episode.episode_number} is free to watch
+              </p>
+              <p className="mt-1 text-sm text-white/60">Sign in to start watching.</p>
+            </div>
+            <Button variant="primary" size="lg" onClick={() => router.push("/auth/login")}>
+              Sign in
+            </Button>
+          </div>
+        )
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">

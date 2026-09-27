@@ -98,7 +98,7 @@ export default function LibraryPage() {
         {(loading || authLoading) && user && (
           <div className="mt-5 grid grid-cols-3 gap-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="aspect-[3/4] w-full" />
+              <Skeleton key={i} className="aspect-[9/16] w-full" />
             ))}
           </div>
         )}

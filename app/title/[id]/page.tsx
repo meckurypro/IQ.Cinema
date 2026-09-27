@@ -45,7 +45,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
 
   return (
     <div className="fade-in">
-      <div className="relative aspect-[3/4] w-full">
+      <div className="relative aspect-[9/16] w-full">
         {title.banner_url || title.poster_url ? (
           <Image
             src={title.banner_url ?? title.poster_url!}
