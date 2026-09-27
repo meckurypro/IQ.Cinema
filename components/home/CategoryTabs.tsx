@@ -57,7 +57,7 @@ export function CategoryTabs({
             href={key === "popular" ? "/" : `/?tab=${key}`}
             className={clsx(
               "text-[16px] font-extrabold uppercase tracking-wide transition-colors",
-              active ? "text-text" : "text-white/55"
+              active ? "text-text" : "text-muted"
             )}
           >
             {label}
@@ -71,7 +71,7 @@ export function CategoryTabs({
           onClick={() => setOpen((v) => !v)}
           className={clsx(
             "flex cursor-pointer items-center gap-1 text-[16px] font-extrabold uppercase tracking-wide transition-colors",
-            isGenreActive ? "text-text" : "text-white/55"
+            isGenreActive ? "text-text" : "text-muted"
           )}
         >
           Genres
