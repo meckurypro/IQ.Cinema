@@ -444,10 +444,10 @@ export default function UploadPage() {
                 type="button"
                 key={ct.value}
                 onClick={() => setContentType(ct.value)}
-                className={`h-14 flex-1 rounded-md border px-2 text-[12px] font-medium transition-colors ${
+                className={`h-14 flex-1 rounded-md border px-2 text-[12px] font-medium transition-all duration-150 active:scale-[0.98] ${
                   contentType === ct.value
                     ? "border-pink bg-pink/10 text-pink"
-                    : "border-border bg-surface text-muted"
+                    : "border-border bg-surface text-muted hover:border-pink/30 hover:text-text"
                 }`}
               >
                 <div>{ct.label}</div>
@@ -546,14 +546,14 @@ export default function UploadPage() {
                               type="button"
                               disabled={deleting}
                               onClick={() => handleDeleteEpisode(d.id)}
-                              className="rounded-md bg-crimson px-2.5 py-1 text-[11px] font-semibold text-white"
+                              className="rounded-md bg-crimson px-2.5 py-1 text-[11px] font-semibold text-white transition-all duration-150 hover:brightness-110 active:scale-[0.97] active:brightness-95 disabled:opacity-50 disabled:pointer-events-none"
                             >
                               {deleting ? "Deleting…" : "Confirm"}
                             </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted"
+                              className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted transition-colors duration-150 hover:bg-border/40 active:scale-[0.97]"
                             >
                               Cancel
                             </button>
@@ -563,7 +563,7 @@ export default function UploadPage() {
                         <button
                           type="button"
                           onClick={() => setConfirmDeleteId(d.id)}
-                          className="flex items-center gap-1 text-[12px] font-medium text-crimson"
+                          className="flex items-center gap-1 text-[12px] font-medium text-crimson transition-colors duration-150 hover:text-crimson/75"
                         >
                           <Trash2 size={13} /> Delete {config.unitLabel.toLowerCase()}
                         </button>
@@ -670,13 +670,14 @@ export default function UploadPage() {
             </div>
 
             {justSaved && (
-              <button
+              <Button
                 type="button"
                 onClick={resetForNextUnit}
-                className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-2 text-[13px] text-muted"
+                variant="ghost"
+                className="w-full border border-dashed border-border text-[13px] text-muted hover:border-pink/40 hover:text-text"
               >
                 <Plus size={14} /> Add another {config.unitLabel.toLowerCase()}
-              </button>
+              </Button>
             )}
 
             <p className="text-center text-[12px] text-muted">
