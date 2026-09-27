@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ThemeScript } from "@/components/shared/ThemeScript";
 import { BottomNav } from "@/components/shared/BottomNav";
+import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata: Metadata = {
   title: "IQ Cinema",
@@ -31,10 +32,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeScript />
       </head>
       <body className="font-sans">
-        <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
-          <main className="flex-1 pb-20">{children}</main>
-          <BottomNav />
-        </div>
+        {/* Mounted once, here, at the root — this is what makes it safe for
+            any number of components (layouts, pages, both at once) to call
+            useAuth() without each one opening its own duplicate realtime
+            subscription. See hooks/useAuth.tsx for why that mattered. */}
+        <AuthProvider>
+          <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
+            <main className="flex-1 pb-20">{children}</main>
+            <BottomNav />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );
