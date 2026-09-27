@@ -11,7 +11,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
 
-type Tab = "applications" | "partners" | "reports" | "settings";
+type Tab = "applications" | "partners" | "reports" | "settings" | "links" | "users";
+
+type FeatureFlag = {
+  key: string;
+  label: string;
+  description: string | null;
+  enabled: boolean;
+};
+
+type UserRole = "viewer" | "creator" | "staff" | "admin";
+
+type SearchedProfile = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  role: UserRole;
+  creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
+};
 
 export default function AdminPage() {
   const { user, profile, loading } = useAuth();
@@ -22,27 +39,86 @@ export default function AdminPage() {
   const [partnerApps, setPartnerApps] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [flags, setFlags] = useState<FeatureFlag[]>([]);
+  const [userQuery, setUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<SearchedProfile[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [userActionId, setUserActionId] = useState<string | null>(null);
 
   async function loadAll() {
-    const [{ data: apps }, { data: pApps }, { data: reps }, { data: s }] = await Promise.all([
-      supabase
-        .from("creator_applications")
-        .select("*, profiles(username, display_name)")
-        .eq("status", "pending"),
-      supabase
-        .from("partner_applications")
-        .select("*, profiles(username, display_name)")
-        .eq("status", "pending"),
-      supabase
-        .from("content_reports")
-        .select("*, titles(title)")
-        .eq("status", "pending"),
-      supabase.from("platform_settings").select("*").single(),
-    ]);
+    const [{ data: apps }, { data: pApps }, { data: reps }, { data: s }, { data: f }] =
+      await Promise.all([
+        supabase
+          .from("creator_applications")
+          .select("*, profiles(username, display_name)")
+          .eq("status", "pending"),
+        supabase
+          .from("partner_applications")
+          .select("*, profiles(username, display_name)")
+          .eq("status", "pending"),
+        supabase
+          .from("content_reports")
+          .select("*, titles(title)")
+          .eq("status", "pending"),
+        supabase.from("platform_settings").select("*").single(),
+        supabase.from("feature_flags").select("*").order("label"),
+      ]);
     setApplications(apps ?? []);
     setPartnerApps(pApps ?? []);
     setReports(reps ?? []);
     setSettings(s);
+    setFlags(f ?? []);
+  }
+
+  async function toggleFlag(key: string, enabled: boolean) {
+    setFlags((prev) => prev.map((f) => (f.key === key ? { ...f, enabled } : f)));
+    await supabase
+      .from("feature_flags")
+      .update({ enabled, updated_at: new Date().toISOString(), updated_by: user?.id })
+      .eq("key", key);
+  }
+
+  async function searchUsers(e?: React.FormEvent) {
+    e?.preventDefault();
+    const q = userQuery.trim();
+    if (!q) {
+      setUserResults([]);
+      return;
+    }
+    setUserSearchLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, role, creator_status")
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(20);
+    setUserResults((data as SearchedProfile[]) ?? []);
+    setUserSearchLoading(false);
+  }
+
+  function patchUserResult(id: string, patch: Partial<SearchedProfile>) {
+    setUserResults((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
+  }
+
+  async function setRole(u: SearchedProfile, role: UserRole) {
+    setUserActionId(u.id);
+    await supabase.from("profiles").update({ role }).eq("id", u.id);
+    patchUserResult(u.id, { role });
+    setUserActionId(null);
+  }
+
+  async function makePartner(u: SearchedProfile) {
+    setUserActionId(u.id);
+    await supabase
+      .from("profiles")
+      .update({ role: "creator", creator_status: "partner" })
+      .eq("id", u.id);
+    await supabase.from("creator_partner_state").upsert({
+      user_id: u.id,
+      is_partner: true,
+      partner_since: new Date().toISOString(),
+    });
+    patchUserResult(u.id, { role: "creator", creator_status: "partner" });
+    setUserActionId(null);
   }
 
   // Mirrors the middleware's server-side redirect for the moment the client
@@ -109,6 +185,8 @@ export default function AdminPage() {
     { key: "applications", label: "Creators", count: applications.length },
     { key: "partners", label: "Partner apps", count: partnerApps.length },
     { key: "reports", label: "Reports", count: reports.length },
+    { key: "links", label: "Links" },
+    { key: "users", label: "Users" },
     { key: "settings", label: "Settings" },
   ];
 
@@ -208,6 +286,125 @@ export default function AdminPage() {
             <p className="mt-6 text-center text-sm text-muted">No pending reports.</p>
           )}
         </ul>
+      )}
+
+      {tab === "links" && (
+        <div className="mt-4 space-y-3">
+          <p className="text-[12px] text-muted">
+            Turn a link off to hide it from every user's profile page — no code changes needed.
+          </p>
+          <ul className="space-y-3">
+            {flags.map((f) => (
+              <li
+                key={f.key}
+                className="flex items-center justify-between rounded-md border border-border bg-surface p-3.5"
+              >
+                <div className="pr-3">
+                  <p className="text-[14px] font-medium text-text">{f.label}</p>
+                  {f.description && (
+                    <p className="mt-0.5 text-[12px] text-muted">{f.description}</p>
+                  )}
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={f.enabled}
+                  onClick={() => toggleFlag(f.key, !f.enabled)}
+                  className={clsx(
+                    "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                    f.enabled ? "bg-gold" : "bg-border"
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
+                      f.enabled ? "translate-x-5" : "translate-x-0.5"
+                    )}
+                  />
+                </button>
+              </li>
+            ))}
+            {!flags.length && (
+              <p className="mt-6 text-center text-sm text-muted">No links configured yet.</p>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {tab === "users" && (
+        <div className="mt-4 space-y-3">
+          <form onSubmit={searchUsers} className="flex gap-2">
+            <input
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              placeholder="Search by username or name"
+              className="h-11 w-full rounded-md border border-border bg-surface px-3 text-[14px] text-text"
+            />
+            <Button type="submit" size="md">
+              Search
+            </Button>
+          </form>
+
+          {userSearchLoading && <p className="text-[13px] text-muted">Searching…</p>}
+
+          <ul className="space-y-3">
+            {userResults.map((u) => (
+              <li key={u.id} className="rounded-md border border-border bg-surface p-3.5">
+                <p className="text-[14px] font-medium text-text">
+                  @{u.username}
+                  {u.display_name ? ` — ${u.display_name}` : ""}
+                </p>
+                <p className="mt-1 text-[12px] text-muted">
+                  Role: {u.role} · Creator status: {u.creator_status}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={userActionId === u.id}
+                    onClick={() => setRole(u, "creator")}
+                  >
+                    Make creator
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={userActionId === u.id}
+                    onClick={() => makePartner(u)}
+                  >
+                    Make partner
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={userActionId === u.id}
+                    onClick={() => setRole(u, "staff")}
+                  >
+                    Make staff
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={userActionId === u.id}
+                    onClick={() => setRole(u, "admin")}
+                  >
+                    Make admin
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={userActionId === u.id}
+                    onClick={() => setRole(u, "viewer")}
+                  >
+                    Reset to viewer
+                  </Button>
+                </div>
+              </li>
+            ))}
+            {!userResults.length && !userSearchLoading && userQuery && (
+              <p className="mt-6 text-center text-sm text-muted">No matching users.</p>
+            )}
+          </ul>
+        </div>
       )}
 
       {tab === "settings" && settings && (
