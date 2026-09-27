@@ -93,25 +93,30 @@ export default async function HomePage({
 
         <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} genres={genres} />
 
-        <HeroBanner
-          featured={
-            featured
-              ? { ...featured, genre_label: featured.genre ?? null }
-              : null
-          }
-          exclusive={exclusive}
-        />
+        {/* Keyed so switching tabs remounts just this part and replays the
+            fade — the header/tab bar above stay put so a tab tap doesn't
+            flicker chrome that didn't change. */}
+        <div key={`${activeTab}-${searchParams.genre ?? ""}`} className="fade-in">
+          <HeroBanner
+            featured={
+              featured
+                ? { ...featured, genre_label: featured.genre ?? null }
+                : null
+            }
+            exclusive={exclusive}
+          />
 
-        <PopularGrid heading={heading} titles={gridTitles} />
+          <PopularGrid heading={heading} titles={gridTitles} />
 
-        {!featured && !gridTitles.length && (
-          <div className="mt-16 px-6 text-center">
-            <p className="font-display text-lg text-text">Nothing published yet</p>
-            <p className="mt-1.5 text-sm text-muted">
-              Once creators publish titles, they'll show up here.
-            </p>
-          </div>
-        )}
+          {!featured && !gridTitles.length && (
+            <div className="mt-16 px-6 text-center">
+              <p className="font-display text-lg text-text">Nothing published yet</p>
+              <p className="mt-1.5 text-sm text-muted">
+                Once creators publish titles, they'll show up here.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </HomeRefresh>
   );

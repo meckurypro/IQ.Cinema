@@ -4,7 +4,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,18 @@ export default function LibraryPage() {
   const [watchlist, setWatchlist] = useState<TitleCardData[]>([]);
   const [history, setHistory] = useState<TitleCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ list: null, history: null });
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const [underline, setUnderline] = useState({ left: 0, width: 0 });
+
+  // Measure the actual rendered button rather than guessing pixel widths for
+  // "My List" vs "History" — robust to font metrics, locale, or copy changes.
+  useLayoutEffect(() => {
+    const btn = tabRefs.current[tab];
+    const bar = tabBarRef.current;
+    if (!btn || !bar) return;
+    setUnderline({ left: btn.offsetLeft, width: btn.offsetWidth });
+  }, [tab]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -68,19 +80,27 @@ export default function LibraryPage() {
       <div className="fade-in px-4 pt-5">
         <h1 className="font-display text-2xl font-semibold text-text">Library</h1>
 
-        <div className="mt-4 flex gap-5 border-b border-border">
+        <div ref={tabBarRef} className="relative mt-4 flex gap-5 border-b border-border">
           {(["list", "history"] as Tab[]).map((t) => (
             <button
               key={t}
+              ref={(el) => {
+                tabRefs.current[t] = el;
+              }}
               onClick={() => setTab(t)}
               className={clsx(
-                "border-b-2 pb-2.5 text-[14px] font-medium transition-colors",
-                tab === t ? "border-pink text-pink" : "border-transparent text-muted"
+                "pb-2.5 text-[14px] font-medium transition-colors",
+                tab === t ? "text-pink" : "text-muted"
               )}
             >
               {t === "list" ? "My List" : "History"}
             </button>
           ))}
+          {/* Sliding underline instead of an instant color/border swap on tap. */}
+          <div
+            className="absolute bottom-0 h-0.5 bg-pink transition-all duration-300 ease-out"
+            style={{ left: underline.left, width: underline.width }}
+          />
         </div>
 
         {!user && !authLoading && (
@@ -104,7 +124,7 @@ export default function LibraryPage() {
         )}
 
         {!loading && user && (
-          <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-4">
+          <div key={tab} className="fade-in mt-5 grid grid-cols-3 gap-x-3 gap-y-4">
             {items.map((t) => (
               <TitleCard key={t.id} title={t} size="sm" />
             ))}

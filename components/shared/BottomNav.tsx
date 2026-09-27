@@ -26,26 +26,47 @@ export function BottomNav() {
   const hideOn = ["/watch/", "/auth/"];
   if (hideOn.some((p) => pathname.startsWith(p))) return null;
 
+  const activeIndex = items.findIndex(({ href }) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href)
+  );
+
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-surface/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <ul className="flex items-stretch justify-between px-1">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+      <ul className="relative flex items-stretch justify-between px-1">
+        {/* Slides to whichever tab is active instead of the color swap being
+            the only signal — a moving element reads as "the app followed
+            your tap" in a way an instant color change doesn't. */}
+        {activeIndex >= 0 && (
+          <div
+            className="pointer-events-none absolute inset-y-0 py-1.5 transition-transform duration-300 ease-out"
+            style={{
+              width: `${100 / items.length}%`,
+              transform: `translateX(${activeIndex * 100}%)`,
+            }}
+          >
+            <div className="h-full w-full rounded-2xl bg-pink/10" />
+          </div>
+        )}
+
+        {items.map(({ href, label, icon: Icon }, i) => {
+          const active = i === activeIndex;
 
           return (
-            <li key={href} className="flex-1">
+            <li key={href} className="relative flex-1">
               <Link
                 href={href}
                 className="flex flex-col items-center gap-0.5 rounded-md py-2 text-[11.5px] transition-colors active:bg-pink/10"
               >
-                <Icon
-                  width={28}
-                  height={28}
-                  className={clsx("transition-colors", active ? "text-pink" : "text-muted")}
-                />
+                <span key={active ? `${href}-active` : href} className={clsx(active && "coin-pop")}>
+                  <Icon
+                    width={28}
+                    height={28}
+                    className={clsx("transition-colors", active ? "text-pink" : "text-muted")}
+                  />
+                </span>
                 <span
                   className={clsx(
                     "font-bold tracking-tight transition-colors",

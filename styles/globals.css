@@ -109,6 +109,18 @@ body {
   animation: sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Soft ring that expands and fades from behind an icon. Only animates
+   box-shadow on one small element — no layout work. The global
+   prefers-reduced-motion rule collapses it to a single instant frame. */
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgb(var(--crimson) / 0.35); }
+  70% { box-shadow: 0 0 0 9px rgb(var(--crimson) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--crimson) / 0); }
+}
+.pulse-glow {
+  animation: pulse-glow 2.4s ease-out infinite;
+}
+
 @keyframes seek-flash {
   0% { opacity: 0; transform: scale(0.75); }
   20% { opacity: 1; transform: scale(1); }

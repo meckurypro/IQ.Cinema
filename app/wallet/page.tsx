@@ -10,14 +10,19 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { CoinPackCard, type CoinPack } from "@/components/wallet/CoinPackCard";
 import { SubscriptionCard, type SubscriptionPlan } from "@/components/wallet/SubscriptionCard";
 import { initializePaystackPurchase, redirectToPaystackCheckout } from "@/lib/paystack";
 import { Skeleton } from "@/components/ui/Skeleton";
+import clsx from "clsx";
 
 export default function WalletPage() {
   const { user } = useAuth();
   const { wallet, loading: walletLoading } = useWallet(user?.id);
+  const { display: balanceDisplay, changed: balanceChanged } = useAnimatedNumber(
+    wallet?.coin_balance
+  );
   const [packs, setPacks] = useState<CoinPack[]>([]);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -70,9 +75,14 @@ export default function WalletPage() {
         {walletLoading ? (
           <Skeleton className="mx-auto mt-2 h-8 w-24" />
         ) : (
-          <p className="mt-1 flex items-center justify-center gap-1.5 font-display text-3xl font-semibold text-text">
+          <p
+            className={clsx(
+              "mt-1 flex items-center justify-center gap-1.5 font-display text-3xl font-semibold tabular-nums text-text",
+              balanceChanged && "coin-pop"
+            )}
+          >
             <Zap size={22} className="fill-gold text-gold" />
-            {wallet?.coin_balance?.toLocaleString() ?? 0}
+            {balanceDisplay.toLocaleString()}
           </p>
         )}
       </div>
