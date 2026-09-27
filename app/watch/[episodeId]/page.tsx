@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { VideoPlayer } from "@/components/watch/VideoPlayer";
 
 type EpisodeData = {
   id: string;
@@ -43,7 +44,6 @@ export default function WatchPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const lastReportedRef = useRef(0);
 
   useEffect(() => {
@@ -139,15 +139,11 @@ export default function WatchPage() {
       </button>
 
       {unlocked ? (
-        <video
-          ref={videoRef}
-          className="h-full w-full object-contain"
-          controls
-          autoPlay
-          playsInline
-          onTimeUpdate={(e) => reportProgress(e.currentTarget.currentTime)}
-          onEnded={() => episode.duration_seconds && reportProgress(episode.duration_seconds)}
+        <VideoPlayer
           src={videoUrl ?? undefined}
+          autoPlay
+          onTimeUpdate={reportProgress}
+          onEnded={() => episode.duration_seconds && reportProgress(episode.duration_seconds)}
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">

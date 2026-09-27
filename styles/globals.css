@@ -109,6 +109,16 @@ body {
   animation: sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes seek-flash {
+  0% { opacity: 0; transform: scale(0.75); }
+  20% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+.seek-flash {
+  animation: seek-flash 650ms ease-out;
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
