@@ -9,8 +9,9 @@ export type Wallet = {
   escrow_balance_naira: number;
 };
 
+const supabase = createClient();
+
 export function useWallet(userId: string | undefined) {
-  const supabase = createClient();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +20,7 @@ export function useWallet(userId: string | undefined) {
     const { data } = await supabase.from("wallets").select("*").eq("user_id", userId).single();
     setWallet(data as Wallet);
     setLoading(false);
-  }, [supabase, userId]);
+  }, [userId]);
 
   useEffect(() => {
     refresh();

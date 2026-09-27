@@ -28,24 +28,35 @@ export default function LibraryPage() {
       return;
     }
 
+    let ignore = false;
+
     async function load() {
-      const { data: wl } = await supabase
-        .from("watchlist")
-        .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
-        .eq("user_id", user!.id);
+      // These two don't depend on each other — fire them together instead
+      // of waiting on one round trip before starting the next.
+      const [{ data: wl }, { data: hist }] = await Promise.all([
+        supabase
+          .from("watchlist")
+          .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
+          .eq("user_id", user!.id),
+        supabase
+          .from("watch_history")
+          .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
+          .eq("user_id", user!.id)
+          .order("updated_at", { ascending: false })
+          .limit(20),
+      ]);
+      // If the user changed (or we unmounted) while these were in flight,
+      // drop the result instead of overwriting newer state with stale data.
+      if (ignore) return;
       setWatchlist((wl ?? []).map((r: any) => r.titles).filter(Boolean));
-
-      const { data: hist } = await supabase
-        .from("watch_history")
-        .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
-        .eq("user_id", user!.id)
-        .order("updated_at", { ascending: false })
-        .limit(20);
       setHistory((hist ?? []).map((r: any) => r.titles).filter(Boolean));
-
       setLoading(false);
     }
     load();
+
+    return () => {
+      ignore = true;
+    };
   }, [user, supabase]);
 
   const items = tab === "list" ? watchlist : history;

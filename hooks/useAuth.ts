@@ -13,42 +13,60 @@ export type Profile = {
   creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
 };
 
+const supabase = createClient();
+
 export function useAuth() {
-  const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
+    // Bumped on every user change so a slow profile fetch from a
+    // superseded user (e.g. sign-out immediately followed by sign-in)
+    // can't land after a newer one and overwrite it.
+    let requestId = 0;
 
-    async function load() {
-      const { data } = await supabase.auth.getUser();
+    async function loadProfile(userId: string, thisRequest: number) {
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      if (mounted && thisRequest === requestId) setProfile(p as Profile);
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
       setUser(data.user ?? null);
-
       if (data.user) {
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single();
-        if (mounted) setProfile(p as Profile);
+        requestId += 1;
+        loadProfile(data.user.id, requestId);
       }
       setLoading(false);
-    }
-    load();
+    });
 
+    // Covers sign-in/sign-out happening while this component is already
+    // mounted (e.g. after the auth callback redirects back), not just the
+    // state at first mount — the initial getUser() above only captures a
+    // snapshot.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      requestId += 1;
       setUser(session?.user ?? null);
-      if (!session?.user) setProfile(null);
+      if (session?.user) {
+        loadProfile(session.user.id, requestId);
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [supabase]);
+    // supabase is a module-level singleton (stable identity), so this only
+    // needs to run once per mount.
+  }, []);
 
   return { user, profile, loading };
 }
