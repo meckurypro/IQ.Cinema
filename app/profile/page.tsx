@@ -4,6 +4,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Wallet, Bell, LogOut, Film } from "lucide-react";
@@ -16,6 +17,24 @@ export default function ProfilePage() {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
   const supabase = createClient();
+  const [showBecomeCreator, setShowBecomeCreator] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase
+      .from("feature_flags")
+      .select("enabled")
+      .eq("key", "become_creator_link")
+      .single()
+      .then(({ data }) => {
+        // Flag missing or unreadable defaults to visible, so a table hiccup
+        // never silently hides the link from every user.
+        if (mounted && data) setShowBecomeCreator(data.enabled);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -53,6 +72,10 @@ export default function ProfilePage() {
     }
   };
   const creator = creatorLink();
+  // Only the initial invite is admin-hideable — a user who already applied,
+  // was declined, or is an active creator/partner still needs their own
+  // status link and dashboard, regardless of the flag.
+  const hideCreatorLink = profile?.creator_status === "none" && !showBecomeCreator;
 
   return (
     <div className="fade-in px-4 pt-5">
@@ -80,12 +103,14 @@ export default function ProfilePage() {
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
-        <Link href={creator.href} className="flex items-center justify-between px-4 py-3.5">
-          <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Film size={17} className="text-muted" /> {creator.label}
-          </span>
-          <ChevronRight size={16} className="text-muted" />
-        </Link>
+        {!hideCreatorLink && (
+          <Link href={creator.href} className="flex items-center justify-between px-4 py-3.5">
+            <span className="flex items-center gap-2.5 text-[14px] text-text">
+              <Film size={17} className="text-muted" /> {creator.label}
+            </span>
+            <ChevronRight size={16} className="text-muted" />
+          </Link>
+        )}
         <button className="flex w-full items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
             <Bell size={17} className="text-muted" /> Notifications
