@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Upload, Check, Plus } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { uploadVideoResumable } from "@/lib/supabase/resumableUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 
@@ -147,6 +148,7 @@ export default function UploadPage() {
 
   const [drafts, setDrafts] = useState<EpisodeRow[]>([]);
   const [saving, setSaving] = useState<"draft" | "submit" | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState<"draft" | "submit" | null>(null);
 
@@ -261,12 +263,21 @@ export default function UploadPage() {
     let videoPath: string | null = existingVideoUrl;
     if (videoFile) {
       const path = `${user.id}/${titleId}/${crypto.randomUUID()}.mp4`;
-      const { error: upErr } = await supabase.storage.from("videos").upload(path, videoFile);
-      if (upErr) {
-        setError(upErr.message);
+      setUploadProgress(0);
+      try {
+        await uploadVideoResumable({
+          bucket: "videos",
+          path,
+          file: videoFile,
+          onProgress: setUploadProgress,
+        });
+      } catch (err: any) {
+        setError(err.message ?? "Upload failed. Check your connection and try again.");
         setSaving(null);
+        setUploadProgress(null);
         return;
       }
+      setUploadProgress(null);
       videoPath = path;
     }
 
@@ -444,6 +455,19 @@ export default function UploadPage() {
               </p>
             )}
             {videoError && <p className="text-[13px] text-crimson">{videoError}</p>}
+            {uploadProgress !== null && (
+              <div className="space-y-1">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-pink transition-[width] duration-200"
+                    style={{ width: `${Math.round(uploadProgress * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted">
+                  Uploading… {Math.round(uploadProgress * 100)}% — you can lock your screen, just don't close the app.
+                </p>
+              </div>
+            )}
             <p className="text-[11px] text-muted">
               {config.label}: max {config.maxDurationLabel} per {config.unitLabel.toLowerCase()}, 9:16 portrait only.
             </p>
@@ -466,10 +490,18 @@ export default function UploadPage() {
                 disabled={saving !== null || !!videoError}
                 onClick={() => handleSaveEpisode("draft")}
               >
-                {saving === "draft" ? "Saving…" : "Save as draft"}
+                {saving === "draft"
+                  ? uploadProgress !== null
+                    ? `Uploading ${Math.round(uploadProgress * 100)}%`
+                    : "Saving…"
+                  : "Save as draft"}
               </Button>
               <Button type="submit" className="flex-1" size="lg" disabled={saving !== null || !!videoError}>
-                {saving === "submit" ? "Submitting…" : "Submit for review"}
+                {saving === "submit"
+                  ? uploadProgress !== null
+                    ? `Uploading ${Math.round(uploadProgress * 100)}%`
+                    : "Submitting…"
+                  : "Submit for review"}
               </Button>
             </div>
 
