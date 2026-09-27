@@ -26,14 +26,30 @@ type Eligibility = {
   active_strikes: number;
 };
 
+// check_partner_eligibility is a Postgres RPC declared as RETURNS TABLE(...),
+// so supabase-js hands back an array of rows (length 0 or 1) even though
+// there's conceptually only ever one row per user. Casting that array
+// straight to `Eligibility` was the bug: `eligibility` ended up being a
+// truthy array with no `.unique_views`/`.eligible` fields, which passed the
+// `eligibility ? ... : <Skeleton />` check and rendered ProgressRow with
+// `value={undefined}`, and `undefined.toLocaleString()` threw. This helper
+// unwraps the row regardless of whether the RPC (or a future change to it)
+// returns an array or a single object.
+function unwrapEligibility(data: unknown): Eligibility | null {
+  if (Array.isArray(data)) return (data[0] as Eligibility) ?? null;
+  return (data as Eligibility) ?? null;
+}
+
 function ProgressRow({ label, value, target }: { label: string; value: number; target: number }) {
-  const pct = Math.min(100, Math.round((value / Math.max(target, 1)) * 100));
+  const safeValue = value ?? 0;
+  const safeTarget = target ?? 0;
+  const pct = Math.min(100, Math.round((safeValue / Math.max(safeTarget, 1)) * 100));
   return (
     <div>
       <div className="flex items-center justify-between text-[12px]">
         <span className="text-muted">{label}</span>
         <span className="text-text">
-          {value.toLocaleString()} / {target.toLocaleString()}
+          {safeValue.toLocaleString()} / {safeTarget.toLocaleString()}
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-raised">
@@ -60,27 +76,45 @@ export default function CreatorDashboardPage() {
       .select("id, slug, title, status, total_unique_views")
       .eq("creator_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }) => setTitles(data ?? []));
+      .then(({ data, error }) => {
+        if (error) console.error("Failed to load titles:", error.message);
+        setTitles(data ?? []);
+      });
 
     supabase
       .from("creator_partner_state")
       .select("is_partner")
       .eq("user_id", user.id)
       .single()
-      .then(({ data }) => setIsPartner(!!data?.is_partner));
+      .then(({ data, error }) => {
+        // PGRST116 = no row found, expected for creators who aren't
+        // partner-tracked yet; anything else is worth logging.
+        if (error && error.code !== "PGRST116") {
+          console.error("Failed to load partner state:", error.message);
+        }
+        setIsPartner(!!data?.is_partner);
+      });
 
     supabase
       .rpc("check_partner_eligibility", { p_user_id: user.id })
-      .then(({ data }) => setEligibility(data as Eligibility));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to load partner eligibility:", error.message);
+          setEligibility(null);
+          return;
+        }
+        setEligibility(unwrapEligibility(data));
+      });
   }, [user, supabase]);
 
   async function applyForPartner() {
     if (!user) return;
     setApplyingPartner(true);
-    await supabase.from("partner_applications").insert({
+    const { error } = await supabase.from("partner_applications").insert({
       user_id: user.id,
       snapshot: eligibility ?? {},
     });
+    if (error) console.error("Failed to submit partner application:", error.message);
     setApplyingPartner(false);
   }
 
