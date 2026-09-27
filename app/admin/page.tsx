@@ -380,7 +380,7 @@ export default function AdminPage() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={clsx(
-              "shrink-0 border-b-2 pb-2.5 text-[13px] font-medium",
+              "shrink-0 border-b-2 pb-2.5 text-[13px] font-medium transition-colors",
               tab === t.key ? "border-gold text-text" : "border-transparent text-muted"
             )}
           >
@@ -416,7 +416,7 @@ export default function AdminPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="danger"
                     disabled={titleActionId === t.id}
                     onClick={() => reviewTitle(t.id, "declined")}
                   >
@@ -468,7 +468,7 @@ export default function AdminPage() {
                 </Button>
                 <Button
                   size="sm"
-                  variant="secondary"
+                  variant="danger"
                   onClick={() => reviewApplication(a.id, a.user_id, "declined")}
                 >
                   Decline
@@ -501,7 +501,7 @@ export default function AdminPage() {
                 <Button size="sm" onClick={() => reviewPartnerApp(a.id, a.user_id, true)}>
                   Approve partner
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => reviewPartnerApp(a.id, a.user_id, false)}>
+                <Button size="sm" variant="danger" onClick={() => reviewPartnerApp(a.id, a.user_id, false)}>
                   Decline
                 </Button>
               </div>
@@ -555,7 +555,7 @@ export default function AdminPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="danger"
                     disabled={withdrawalActionId === w.id}
                     onClick={() => declineWithdrawal(w)}
                   >

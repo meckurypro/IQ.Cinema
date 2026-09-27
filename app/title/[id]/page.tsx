@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Lock, Play, Bookmark, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/Button";
 
 async function getTitle(slug: string) {
   const supabase = createClient();
@@ -73,17 +74,14 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         <div className="mt-4 flex gap-2">
           <Link
             href={episodes[0] ? `/watch/${episodes[0].id}` : "#"}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
           >
             <Play size={16} className="fill-white" />
             Watch now
           </Link>
-          <button
-            aria-label="Add to library"
-            className="flex h-11 w-11 items-center justify-center rounded-md border border-border bg-surface text-text"
-          >
+          <Button variant="secondary" size="icon" aria-label="Add to library">
             <Bookmark size={17} />
-          </button>
+          </Button>
         </div>
       </div>
 

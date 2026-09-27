@@ -196,12 +196,14 @@ export default function ProfilePage() {
         </button>
       </nav>
 
-      <button
+      <Button
         onClick={handleSignOut}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-md border border-border py-3 text-[14px] font-medium text-crimson"
+        variant="secondary"
+        size="lg"
+        className="mt-5 w-full text-crimson"
       >
         <LogOut size={16} /> Sign out
-      </button>
+      </Button>
     </div>
   );
 }
