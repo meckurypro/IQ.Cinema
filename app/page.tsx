@@ -5,6 +5,7 @@ import { HomeHeader } from "@/components/home/HomeHeader";
 import { CategoryTabs } from "@/components/home/CategoryTabs";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { PopularGrid } from "@/components/home/PopularGrid";
+import { HomeRefresh } from "@/components/home/HomeRefresh";
 
 export const revalidate = 60;
 
@@ -86,30 +87,32 @@ export default async function HomePage({
   );
 
   return (
-    <div className="fade-in pb-6">
-      <HomeHeader />
+    <HomeRefresh>
+      <div className="fade-in pb-6">
+        <HomeHeader />
 
-      <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} genres={genres} />
+        <CategoryTabs activeTab={activeTab} activeGenre={searchParams.genre} genres={genres} />
 
-      <HeroBanner
-        featured={
-          featured
-            ? { ...featured, genre_label: featured.genre ?? null }
-            : null
-        }
-        exclusive={exclusive}
-      />
+        <HeroBanner
+          featured={
+            featured
+              ? { ...featured, genre_label: featured.genre ?? null }
+              : null
+          }
+          exclusive={exclusive}
+        />
 
-      <PopularGrid heading={heading} titles={gridTitles} />
+        <PopularGrid heading={heading} titles={gridTitles} />
 
-      {!featured && !gridTitles.length && (
-        <div className="mt-16 px-6 text-center">
-          <p className="font-display text-lg text-text">Nothing published yet</p>
-          <p className="mt-1.5 text-sm text-muted">
-            Once creators publish titles, they'll show up here.
-          </p>
-        </div>
-      )}
-    </div>
+        {!featured && !gridTitles.length && (
+          <div className="mt-16 px-6 text-center">
+            <p className="font-display text-lg text-text">Nothing published yet</p>
+            <p className="mt-1.5 text-sm text-muted">
+              Once creators publish titles, they'll show up here.
+            </p>
+          </div>
+        )}
+      </div>
+    </HomeRefresh>
   );
 }
