@@ -11,7 +11,7 @@ export type PopularCardData = {
 export function PopularCard({ title, rank }: { title: PopularCardData; rank: number }) {
   return (
     <Link href={`/title/${title.slug}`} className="group block">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-raised">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-lg bg-surface-raised">
         {title.poster_url ? (
           <Image
             src={title.poster_url}

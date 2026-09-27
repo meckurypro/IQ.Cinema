@@ -21,7 +21,7 @@ export default function HomeLoading() {
 
       <div className="mt-6 grid grid-cols-3 gap-2 px-4">
         {Array.from({ length: 9 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[2/3] rounded-md" />
+          <Skeleton key={i} className="aspect-[9/16] rounded-md" />
         ))}
       </div>
     </div>

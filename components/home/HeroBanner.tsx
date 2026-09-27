@@ -22,7 +22,7 @@ export function HeroBanner({
     <div className="mt-4 flex gap-2 px-4">
       <Link
         href={`/title/${featured.slug}`}
-        className="relative aspect-[4/5] flex-[2] overflow-hidden rounded-lg bg-surface-raised"
+        className="relative aspect-[9/16] flex-[2] overflow-hidden rounded-lg bg-surface-raised"
       >
         {(featured.banner_url ?? featured.poster_url) && (
           <Image
@@ -48,7 +48,7 @@ export function HeroBanner({
       {exclusive && (
         <Link
           href={`/title/${exclusive.slug}`}
-          className="relative aspect-[4/5] flex-1 overflow-hidden rounded-lg bg-surface-raised"
+          className="relative aspect-[9/16] flex-1 overflow-hidden rounded-lg bg-surface-raised"
         >
           {(exclusive.banner_url ?? exclusive.poster_url) && (
             <Image

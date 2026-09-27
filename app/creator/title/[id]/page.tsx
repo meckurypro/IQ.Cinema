@@ -168,7 +168,7 @@ export default function ManageTitlePage() {
     if (rpcErr || !data?.ok) {
       const reason =
         data?.error === "no_video"
-          ? `Add at least one ${(UNIT_LABEL[title?.content_type ?? ""] ?? "episode").toLowerCase()} with a video before submitting.`
+          ? `Finalize at least one ${(UNIT_LABEL[title?.content_type ?? ""] ?? "episode").toLowerCase()} (not just save as draft) before submitting.`
           : rpcErr?.message || data?.error || "Could not submit for review.";
       setError(reason);
       return;
@@ -206,7 +206,11 @@ export default function ManageTitlePage() {
   }
 
   const unitLabel = UNIT_LABEL[title.content_type] ?? "Episode";
-  const hasVideo = episodes.some((e) => !!e.video_url);
+  // Only an episode that's been finalized (sent into the transcode
+  // pipeline or already published) counts — a video_url can exist on a
+  // still-draft episode mid-edit, which used to let a project get
+  // submitted (and approved) with nothing actually playable.
+  const hasFinalizedEpisode = episodes.some((e) => e.status === "processing" || e.status === "published");
   const meta = STATUS_META[title.status];
   const canSubmit = ["draft", "rejected", "withdrawn"].includes(title.status);
   const canWithdraw = ["in_review", "published"].includes(title.status);
@@ -247,9 +251,9 @@ export default function ManageTitlePage() {
         {canSubmit && (
           <Button
             size="sm"
-            disabled={actionBusy !== null || !hasVideo}
+            disabled={actionBusy !== null || !hasFinalizedEpisode}
             onClick={submitForReview}
-            title={!hasVideo ? "Add a video to an episode first" : undefined}
+            title={!hasFinalizedEpisode ? `Finalize a ${unitLabel.toLowerCase()} first` : undefined}
           >
             {actionBusy === "submit" ? "Submitting…" : "Submit for admin review"}
           </Button>
