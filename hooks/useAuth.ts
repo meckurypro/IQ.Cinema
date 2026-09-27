@@ -9,7 +9,7 @@ export type Profile = {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  role: "viewer" | "creator" | "admin";
+  role: "viewer" | "creator" | "staff" | "admin";
   creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
 };
 
