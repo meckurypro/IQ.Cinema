@@ -12,6 +12,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
+import { ActionRail } from "@/components/watch/ActionRail";
+import { CommentsSheet } from "@/components/watch/CommentsSheet";
+import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
 
 type EpisodeData = {
   id: string;
@@ -21,6 +24,9 @@ type EpisodeData = {
   video_url: string | null;
   duration_seconds: number | null;
   unlock_cost_coins: number | null;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
 };
 
 function getDeviceId() {
@@ -41,11 +47,28 @@ export default function WatchPage() {
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const [freeCount, setFreeCount] = useState<number | null>(null);
+  const [defaultUnlockCost, setDefaultUnlockCost] = useState(30);
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastReportedRef = useRef(0);
+
+  // Engagement: like (episode) + save (title-level, mirrors My List) + share.
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [saveCount, setSaveCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
+  const [shareCount, setShareCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+  const [showTray, setShowTray] = useState(false);
+  const [shareToast, setShareToast] = useState(false);
+
+  // Episode tray: the full episode list for this title, plus which of them
+  // this viewer has paid to unlock (free-by-count ones don't need an entry).
+  const [trayEpisodes, setTrayEpisodes] = useState<TrayEpisode[]>([]);
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
 
   // Free-by-count episodes are already granted for free by the
   // unlock_episode RPC itself — this is just so the UI can show that up
@@ -58,33 +81,93 @@ export default function WatchPage() {
     async function load() {
       const { data: ep } = await supabase
         .from("episodes")
-        .select("id, episode_number, name, title_id, video_url, duration_seconds, unlock_cost_coins")
+        .select(
+          "id, episode_number, name, title_id, video_url, duration_seconds, unlock_cost_coins, like_count, comment_count, share_count"
+        )
         .eq("id", episodeId)
         .single();
       setEpisode(ep as EpisodeData);
+      if (ep) {
+        setLikeCount(ep.like_count ?? 0);
+        setCommentCount(ep.comment_count ?? 0);
+        setShareCount(ep.share_count ?? 0);
+      }
 
       if (ep) {
         const [{ data: t }, { data: settings }] = await Promise.all([
-          supabase.from("titles").select("free_episode_count").eq("id", ep.title_id).single(),
-          supabase.from("platform_settings").select("default_free_episodes").single(),
+          supabase.from("titles").select("free_episode_count, save_count").eq("id", ep.title_id).single(),
+          supabase
+            .from("platform_settings")
+            .select("default_free_episodes, default_episode_unlock_coins")
+            .single(),
         ]);
         setFreeCount(t?.free_episode_count ?? settings?.default_free_episodes ?? 4);
+        setDefaultUnlockCost(settings?.default_episode_unlock_coins ?? 30);
+        setSaveCount(t?.save_count ?? 0);
       }
 
-      if (user) {
-        const { data: unlock } = await supabase
-          .from("episode_unlocks")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("episode_id", episodeId)
-          .maybeSingle();
+      if (user && ep) {
+        const [{ data: unlock }, { data: likeRow }, { data: saveRow }] = await Promise.all([
+          supabase
+            .from("episode_unlocks")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("episode_id", episodeId)
+            .maybeSingle(),
+          supabase
+            .from("episode_likes")
+            .select("user_id")
+            .eq("user_id", user.id)
+            .eq("episode_id", episodeId)
+            .maybeSingle(),
+          supabase
+            .from("watchlist")
+            .select("user_id")
+            .eq("user_id", user.id)
+            .eq("title_id", ep.title_id)
+            .maybeSingle(),
+        ]);
         setUnlocked(!!unlock);
+        setLiked(!!likeRow);
+        setSaved(!!saveRow);
       } else {
         setUnlocked(false);
+        setLiked(false);
+        setSaved(false);
       }
     }
     if (episodeId) load();
   }, [episodeId, user, supabase]);
+
+  // Episode tray data: every published episode of this title, plus which
+  // ones this viewer has already paid to unlock.
+  useEffect(() => {
+    async function loadTray() {
+      if (!episode?.title_id) return;
+      const { data: eps } = await supabase
+        .from("episodes")
+        .select("id, episode_number, name, unlock_cost_coins")
+        .eq("title_id", episode.title_id)
+        .eq("status", "published")
+        .order("episode_number", { ascending: true });
+      setTrayEpisodes(eps ?? []);
+
+      if (user && eps?.length) {
+        const { data: unlocks } = await supabase
+          .from("episode_unlocks")
+          .select("episode_id")
+          .eq("user_id", user.id)
+          .in(
+            "episode_id",
+            eps.map((e) => e.id)
+          );
+        setUnlockedIds(new Set((unlocks ?? []).map((u) => u.episode_id)));
+      } else {
+        setUnlockedIds(new Set());
+      }
+    }
+    loadTray();
+  }, [episode?.title_id, user, supabase]);
 
   // Free episodes need no coin/subscription decision from the viewer — grant
   // them automatically the moment we know both that it's free and that the
@@ -144,6 +227,103 @@ export default function WatchPage() {
       p_episode_id: episode.id,
       p_watched_seconds: Math.floor(seconds),
     });
+
+    // Keep the Library "History" tab in sync with actual playback progress.
+    if (user) {
+      const completed = episode.duration_seconds
+        ? seconds >= episode.duration_seconds * 0.9
+        : false;
+      supabase
+        .from("watch_history")
+        .upsert(
+          {
+            user_id: user.id,
+            episode_id: episode.id,
+            title_id: episode.title_id,
+            progress_seconds: Math.floor(seconds),
+            completed,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,episode_id" }
+        )
+        .then(() => {});
+    }
+  }
+
+  async function toggleLike() {
+    if (!user || !episode) {
+      router.push("/auth/login");
+      return;
+    }
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+
+    const { error: err } = next
+      ? await supabase.from("episode_likes").insert({ user_id: user.id, episode_id: episode.id })
+      : await supabase
+          .from("episode_likes")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("episode_id", episode.id);
+
+    if (err) {
+      // Revert on failure (e.g. offline) rather than leaving the UI out of sync.
+      setLiked(!next);
+      setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
+  }
+
+  async function toggleSave() {
+    if (!user || !episode) {
+      router.push("/auth/login");
+      return;
+    }
+    const next = !saved;
+    setSaved(next);
+    setSaveCount((c) => Math.max(0, c + (next ? 1 : -1)));
+
+    const { error: err } = next
+      ? await supabase.from("watchlist").insert({ user_id: user.id, title_id: episode.title_id })
+      : await supabase
+          .from("watchlist")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("title_id", episode.title_id);
+
+    if (err) {
+      setSaved(!next);
+      setSaveCount((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
+  }
+
+  async function handleShare() {
+    if (!episode) return;
+    const url = typeof window !== "undefined" ? `${window.location.origin}/watch/${episode.id}` : "";
+
+    const { data } = await supabase.rpc("record_episode_share", { p_episode_id: episode.id });
+    setShareCount(data?.ok ? data.share_count : (c: number) => c + 1);
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: episode.name ?? `Episode ${episode.episode_number}`,
+          url,
+        });
+        return;
+      } catch {
+        // User canceled the native share sheet — fall through to nothing further.
+        return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 1800);
+    } catch {
+      // Clipboard unavailable — silently no-op rather than block the UI.
+    }
   }
 
   if (!episode || unlocked === null) {
@@ -209,7 +389,7 @@ export default function WatchPage() {
           {error && <p className="text-sm text-crimson">{error}</p>}
           <Button variant="primary" size="lg" disabled={unlocking} onClick={handleUnlock}>
             <Zap size={16} className="fill-current" />
-            Unlock for {episode.unlock_cost_coins ?? 30} coins
+            Unlock for {episode.unlock_cost_coins ?? defaultUnlockCost} coins
           </Button>
           <button
             onClick={() => router.push("/wallet")}
@@ -219,6 +399,47 @@ export default function WatchPage() {
           </button>
         </div>
       )}
+
+      <ActionRail
+        liked={liked}
+        likeCount={likeCount}
+        onToggleLike={toggleLike}
+        saved={saved}
+        saveCount={saveCount}
+        onToggleSave={toggleSave}
+        commentCount={commentCount}
+        onOpenComments={() => setShowComments(true)}
+        shareCount={shareCount}
+        onShare={handleShare}
+        onOpenEpisodes={() => setShowTray(true)}
+        episodeNumber={episode.episode_number}
+      />
+
+      {shareToast && (
+        <div className="absolute inset-x-0 bottom-28 z-30 flex justify-center">
+          <span className="rounded-full bg-black/70 px-3.5 py-1.5 text-[12px] font-medium text-white">
+            Link copied
+          </span>
+        </div>
+      )}
+
+      <CommentsSheet
+        open={showComments}
+        onClose={() => setShowComments(false)}
+        episodeId={episode.id}
+        count={commentCount}
+        onCountChange={setCommentCount}
+      />
+
+      <EpisodeTray
+        open={showTray}
+        onClose={() => setShowTray(false)}
+        episodes={trayEpisodes}
+        currentEpisodeId={episode.id}
+        freeCount={freeCount ?? 4}
+        unlockedIds={unlockedIds}
+        defaultCost={defaultUnlockCost}
+      />
     </div>
   );
 }
