@@ -20,16 +20,22 @@ type FeatureFlag = {
   enabled: boolean;
 };
 
-type UserRole = "viewer" | "creator" | "staff" | "admin";
+// `role` only ever represents the content-tier progression now (viewer ->
+// creator, with "partner" layered on top via creator_status/is_partner
+// rather than being its own role value). Staff and admin are independent
+// flags — any tier can also be staff, and/or also be admin.
+type ContentTier = "viewer" | "creator" | "partner";
 
 type SearchedProfile = {
   id: string;
   username: string;
   display_name: string | null;
   email: string;
-  role: UserRole;
+  role: "viewer" | "creator";
   creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
   is_partner: boolean;
+  is_staff: boolean;
+  is_admin: boolean;
 };
 
 type WithdrawalRequest = {
@@ -46,12 +52,20 @@ type WithdrawalRequest = {
   requested_at: string;
 };
 
-const ROLE_OPTIONS: { key: UserRole; label: string }[] = [
+// Viewer / Creator / Partner is a single progression — exactly one is
+// active at a time — so these stay a linked group. Staff and admin are
+// rendered separately below as fully independent switches.
+const TIER_OPTIONS: { key: ContentTier; label: string }[] = [
   { key: "viewer", label: "Viewer" },
   { key: "creator", label: "Creator" },
-  { key: "staff", label: "Staff" },
-  { key: "admin", label: "Admin" },
+  { key: "partner", label: "Partner" },
 ];
+
+function tierOf(u: Pick<SearchedProfile, "role" | "creator_status">): ContentTier {
+  if (u.creator_status === "partner") return "partner";
+  if (u.role === "creator") return "creator";
+  return "viewer";
+}
 
 export default function AdminPage() {
   const { user, profile, loading } = useAuth();
@@ -135,26 +149,44 @@ export default function AdminPage() {
     setUserResults((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
   }
 
-  async function setRole(u: SearchedProfile, role: UserRole) {
-    if (role === u.role) return; // already this role — toggle is a no-op
+  // All three mutations go through admin_update_user_access so the server
+  // stays the single source of truth for the partner-implies-creator rule —
+  // the client never assembles role/creator_status/is_partner by hand.
+  async function setTier(u: SearchedProfile, tier: ContentTier) {
+    if (tier === tierOf(u)) return; // already at this tier — no-op
     setUserActionId(u.id);
-    await supabase.from("profiles").update({ role }).eq("id", u.id);
-    patchUserResult(u.id, { role });
+    const { data, error } = await supabase.rpc("admin_update_user_access", {
+      p_user_id: u.id,
+      p_tier: tier,
+    });
+    if (!error && data?.ok) {
+      const creator_status = tier === "partner" ? "partner" : tier === "creator" ? "approved" : "none";
+      const role = tier === "viewer" ? "viewer" : "creator";
+      patchUserResult(u.id, { role, creator_status, is_partner: tier === "partner" });
+    }
     setUserActionId(null);
   }
 
-  // Partner is a tier layered on top of role, not a role itself — an admin can
-  // also be a partner (as in your screenshot), so this never touches `role`.
-  async function togglePartner(u: SearchedProfile, isPartner: boolean) {
+  // Staff and admin are independent of tier and of each other — this can
+  // never silently clear the other three fields the way the old single
+  // `role` column used to.
+  async function setStaff(u: SearchedProfile, isStaff: boolean) {
     setUserActionId(u.id);
-    const creator_status = isPartner ? "partner" : "approved";
-    await supabase.from("profiles").update({ creator_status }).eq("id", u.id);
-    await supabase.from("creator_partner_state").upsert({
-      user_id: u.id,
-      is_partner: isPartner,
-      partner_since: isPartner ? new Date().toISOString() : null,
+    const { data, error } = await supabase.rpc("admin_update_user_access", {
+      p_user_id: u.id,
+      p_is_staff: isStaff,
     });
-    patchUserResult(u.id, { creator_status, is_partner: isPartner });
+    if (!error && data?.ok) patchUserResult(u.id, { is_staff: isStaff });
+    setUserActionId(null);
+  }
+
+  async function setAdmin(u: SearchedProfile, isAdmin: boolean) {
+    setUserActionId(u.id);
+    const { data, error } = await supabase.rpc("admin_update_user_access", {
+      p_user_id: u.id,
+      p_is_admin: isAdmin,
+    });
+    if (!error && data?.ok) patchUserResult(u.id, { is_admin: isAdmin });
     setUserActionId(null);
   }
 
@@ -167,11 +199,11 @@ export default function AdminPage() {
       router.replace("/auth/login?next=%2Fadmin");
       return;
     }
-    if (profile && profile.role !== "admin") {
+    if (profile && !profile.is_admin) {
       router.replace("/");
       return;
     }
-    if (profile?.role === "admin") loadAll();
+    if (profile?.is_admin) loadAll();
   }, [loading, user, profile]);
 
   async function reviewApplication(id: string, userId: string, decision: "approved" | "declined" | "ignored") {
@@ -263,7 +295,7 @@ export default function AdminPage() {
     loadAll();
   }
 
-  if (loading || !user || profile?.role !== "admin") {
+  if (loading || !user || !profile?.is_admin) {
     return null;
   }
 
@@ -499,18 +531,20 @@ export default function AdminPage() {
                 <p className="mt-1 text-[12px] text-muted">{u.email}</p>
 
                 <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Role
+                  Content tier — viewer applies to become creator, creator applies to become
+                  partner
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-2">
-                  {ROLE_OPTIONS.map((opt) => {
-                    const active = u.role === opt.key;
+                  {TIER_OPTIONS.map((opt) => {
+                    const active = tierOf(u) === opt.key;
                     return (
                       <button
                         key={opt.key}
                         type="button"
-                        aria-pressed={active}
+                        role="switch"
+                        aria-checked={active}
                         disabled={userActionId === u.id}
-                        onClick={() => setRole(u, opt.key)}
+                        onClick={() => setTier(u, opt.key)}
                         className={clsx(
                           "rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-50",
                           active
@@ -524,32 +558,54 @@ export default function AdminPage() {
                   })}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
-                  <div className="pr-3">
-                    <p className="text-[13px] font-medium text-text">Partner</p>
-                    <p className="mt-0.5 text-[11px] text-muted">
-                      Revenue-share tier — independent of role
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={u.is_partner}
-                    aria-label="Partner"
-                    disabled={userActionId === u.id}
-                    onClick={() => togglePartner(u, !u.is_partner)}
-                    className={clsx(
-                      "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-50",
-                      u.is_partner ? "bg-pink" : "bg-border"
-                    )}
-                  >
-                    <span
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Staff &amp; admin — independent of content tier and of each other
+                </p>
+                <div className="mt-1.5 space-y-2">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
+                    <p className="text-[13px] font-medium text-text">Staff</p>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={u.is_staff}
+                      aria-label="Staff"
+                      disabled={userActionId === u.id}
+                      onClick={() => setStaff(u, !u.is_staff)}
                       className={clsx(
-                        "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
-                        u.is_partner ? "translate-x-5" : "translate-x-0"
+                        "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-50",
+                        u.is_staff ? "bg-pink" : "bg-border"
                       )}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={clsx(
+                          "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                          u.is_staff ? "translate-x-5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
+                    <p className="text-[13px] font-medium text-text">Admin</p>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={u.is_admin}
+                      aria-label="Admin"
+                      disabled={userActionId === u.id}
+                      onClick={() => setAdmin(u, !u.is_admin)}
+                      className={clsx(
+                        "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-50",
+                        u.is_admin ? "bg-pink" : "bg-border"
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                          u.is_admin ? "translate-x-5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}

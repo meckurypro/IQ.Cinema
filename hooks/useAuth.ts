@@ -9,8 +9,13 @@ export type Profile = {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  role: "viewer" | "creator" | "staff" | "admin";
+  // `role` is only ever the content tier now (partner is layered on top via
+  // creator_status). Staff and admin are independent flags — any tier can
+  // also be staff and/or admin at the same time.
+  role: "viewer" | "creator";
   creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
+  is_staff: boolean;
+  is_admin: boolean;
 };
 
 const supabase = createClient();
