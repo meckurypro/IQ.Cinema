@@ -5,6 +5,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +14,8 @@ import clsx from "clsx";
 type Tab = "applications" | "partners" | "reports" | "settings";
 
 export default function AdminPage() {
-  const { profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const router = useRouter();
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("applications");
   const [applications, setApplications] = useState<any[]>([]);
@@ -43,9 +45,21 @@ export default function AdminPage() {
     setSettings(s);
   }
 
+  // Mirrors the middleware's server-side redirect for the moment the client
+  // takes over — the middleware is what actually enforces this, this is just
+  // belt-and-suspenders so a stale client render never flashes admin data.
   useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace("/auth/login?next=%2Fadmin");
+      return;
+    }
+    if (profile && profile.role !== "admin") {
+      router.replace("/");
+      return;
+    }
     if (profile?.role === "admin") loadAll();
-  }, [profile]);
+  }, [loading, user, profile]);
 
   async function reviewApplication(id: string, userId: string, decision: "approved" | "declined" | "ignored") {
     await supabase
@@ -87,8 +101,8 @@ export default function AdminPage() {
     loadAll();
   }
 
-  if (profile && profile.role !== "admin") {
-    return <p className="px-4 pt-10 text-center text-sm text-muted">Admin access required.</p>;
+  if (loading || !user || profile?.role !== "admin") {
+    return null;
   }
 
   const tabs: { key: Tab; label: string; count?: number }[] = [

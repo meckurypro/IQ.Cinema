@@ -34,7 +34,13 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/");
+
+    // Only ever redirect within the app — an absolute or protocol-relative
+    // `next` value would be an open redirect.
+    const rawNext = searchParams.get("next");
+    const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+
+    router.push(next);
     router.refresh();
   }
 

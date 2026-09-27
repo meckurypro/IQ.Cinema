@@ -24,7 +24,33 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired — required for Server Components to see auth state
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Admin dashboard: logged out -> login (not a separate admin login), logged
+  // in but not an admin (viewer/creator/partner/staff all included) -> home.
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/login";
+      url.search = `?next=${encodeURIComponent(request.nextUrl.pathname)}`;
+      return NextResponse.redirect(url);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
 
   return response;
 }
