@@ -1,0 +1,131 @@
+// components/watch/TitleDetailsSheet.tsx
+
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { Eye } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { BottomSheet } from "@/components/shared/BottomSheet";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { formatCount } from "@/lib/format";
+
+type SimilarTitle = {
+  id: string;
+  slug: string;
+  title: string;
+  poster_url: string | null;
+};
+
+export function TitleDetailsSheet({
+  open,
+  onClose,
+  titleId,
+  title,
+  synopsis,
+  views,
+  contentRating,
+}: {
+  open: boolean;
+  onClose: () => void;
+  titleId: string | undefined;
+  title: string;
+  synopsis: string | null;
+  views: number;
+  contentRating?: string | null;
+}) {
+  const supabase = createClient();
+  const [tags, setTags] = useState<string[] | null>(null);
+  const [similar, setSimilar] = useState<SimilarTitle[] | null>(null);
+
+  const load = useCallback(async () => {
+    if (!titleId) return;
+    const [{ data: genreRows }, { data: similarRows }] = await Promise.all([
+      supabase.from("title_genres").select("genres(name)").eq("title_id", titleId),
+      supabase
+        .from("titles")
+        .select("id, slug, title, poster_url")
+        .eq("status", "published")
+        .neq("id", titleId)
+        .order("total_unique_views", { ascending: false })
+        .limit(8),
+    ]);
+    setTags(
+      ((genreRows ?? []) as unknown as { genres: { name: string } | null }[])
+        .map((r) => r.genres?.name)
+        .filter((n): n is string => !!n)
+    );
+    setSimilar((similarRows as SimilarTitle[]) ?? []);
+  }, [titleId, supabase]);
+
+  // Re-fetch every time the sheet opens — tags/similar titles may have
+  // changed since it was last shown.
+  useEffect(() => {
+    if (open) {
+      setTags(null);
+      setSimilar(null);
+      load();
+    }
+  }, [open, load]);
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Details">
+      <div className="flex flex-col gap-4 px-3 pb-3 pt-1">
+        <div>
+          <h3 className="font-display text-[17px] font-semibold text-text">{title}</h3>
+          <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
+            <Eye size={13} />
+            {formatCount(views)} views
+            {contentRating ? ` · ${contentRating}` : ""}
+          </p>
+          {synopsis && <p className="mt-3 text-[14px] leading-relaxed text-text/85">{synopsis}</p>}
+        </div>
+
+        {tags === null ? (
+          <div className="flex gap-2">
+            <Skeleton className="h-7 w-16 rounded-full" />
+            <Skeleton className="h-7 w-16 rounded-full" />
+          </div>
+        ) : tags.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-surface-raised px-3 py-1 text-[12px] font-medium text-muted"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        <div>
+          <h4 className="mb-2 text-[14px] font-semibold text-text">Similar titles</h4>
+          {similar === null ? (
+            <div className="flex gap-2.5 overflow-x-auto">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-32 w-[86px] shrink-0 rounded-md" />
+              ))}
+            </div>
+          ) : similar.length > 0 ? (
+            <div className="flex gap-2.5 overflow-x-auto pb-1">
+              {similar.map((t) => (
+                <Link key={t.id} href={`/title/${t.slug}`} onClick={onClose} className="w-[86px] shrink-0">
+                  <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-surface-raised">
+                    {t.poster_url && (
+                      <Image src={t.poster_url} alt={t.title} fill className="object-cover" />
+                    )}
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-medium text-text">{t.title}</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="py-2 text-[13px] text-muted">Nothing similar published yet.</p>
+          )}
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
