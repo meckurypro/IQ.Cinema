@@ -4,10 +4,11 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Wallet, Bell, LogOut, Film } from "lucide-react";
+import { ChevronRight, Wallet, Bell, LogOut, Film, Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -18,6 +19,58 @@ export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
   const [showBecomeCreator, setShowBecomeCreator] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // profile loads asynchronously after useAuth's own fetch — pick up its
+  // avatar_url once available instead of only reading it at mount time.
+  useEffect(() => {
+    if (profile?.avatar_url) setAvatarUrl(profile.avatar_url);
+  }, [profile?.avatar_url]);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user) return;
+
+    setAvatarError(null);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setAvatarError("Use a JPG, PNG, or WEBP image.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("Image must be under 2MB.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    // Fixed filename per user (not the original name) — upsert overwrites
+    // the same object on every change instead of accumulating orphans.
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = `${user.id}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, cacheControl: "3600" });
+
+    if (uploadError) {
+      setAvatarError(uploadError.message);
+      setAvatarUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    // Cache-bust: the path is stable across uploads, so without this the
+    // browser (and any CDN) would keep serving the previous image.
+    const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+
+    await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
+
+    setAvatarUrl(publicUrl);
+    setAvatarUploading(false);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -80,14 +133,38 @@ export default function ProfilePage() {
   return (
     <div className="fade-in px-4 pt-5">
       <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-raised font-display text-lg font-semibold text-text">
-          {(profile?.display_name ?? "U")[0]?.toUpperCase()}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+            aria-label="Change profile photo"
+            className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-surface-raised font-display text-lg font-semibold text-text disabled:opacity-70"
+          >
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="" fill sizes="56px" className="object-cover" />
+            ) : (
+              (profile?.display_name ?? "U")[0]?.toUpperCase()
+            )}
+          </button>
+          <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-pink text-white ring-2 ring-bg">
+            <Camera size={11} />
+          </span>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
         </div>
         <div>
           <p className="text-[16px] font-semibold text-text">
             {profile?.display_name ?? "—"}
           </p>
           <p className="text-[13px] text-muted">@{profile?.username}</p>
+          {avatarUploading && <p className="mt-0.5 text-[11px] text-muted">Uploading…</p>}
+          {avatarError && <p className="mt-0.5 text-[11px] text-crimson">{avatarError}</p>}
         </div>
       </div>
 
