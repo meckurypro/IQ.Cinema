@@ -4,14 +4,14 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
 
-type Tab = "applications" | "partners" | "reports" | "settings" | "links" | "users";
+type Tab = "applications" | "partners" | "reports" | "settings" | "links" | "users" | "withdrawals";
 
 type FeatureFlag = {
   key: string;
@@ -26,9 +26,32 @@ type SearchedProfile = {
   id: string;
   username: string;
   display_name: string | null;
+  email: string;
   role: UserRole;
   creator_status: "none" | "applied" | "approved" | "declined" | "ignored" | "partner";
+  is_partner: boolean;
 };
+
+type WithdrawalRequest = {
+  id: string;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  email: string;
+  amount_naira: number;
+  bank_account_name: string;
+  bank_account_number: string;
+  bank_code: string;
+  status: "requested" | "approved" | "paid" | "declined";
+  requested_at: string;
+};
+
+const ROLE_OPTIONS: { key: UserRole; label: string }[] = [
+  { key: "viewer", label: "Viewer" },
+  { key: "creator", label: "Creator" },
+  { key: "staff", label: "Staff" },
+  { key: "admin", label: "Admin" },
+];
 
 export default function AdminPage() {
   const { user, profile, loading } = useAuth();
@@ -44,9 +67,15 @@ export default function AdminPage() {
   const [userResults, setUserResults] = useState<SearchedProfile[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [userActionId, setUserActionId] = useState<string | null>(null);
+  // Bumped on every keystroke so a slow, now-stale request can't clobber the
+  // results of a newer one that resolved first.
+  const userSearchSeq = useRef(0);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [withdrawalActionId, setWithdrawalActionId] = useState<string | null>(null);
+  const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
 
   async function loadAll() {
-    const [{ data: apps }, { data: pApps }, { data: reps }, { data: s }, { data: f }] =
+    const [{ data: apps }, { data: pApps }, { data: reps }, { data: s }, { data: f }, { data: w }] =
       await Promise.all([
         supabase
           .from("creator_applications")
@@ -62,12 +91,14 @@ export default function AdminPage() {
           .eq("status", "pending"),
         supabase.from("platform_settings").select("*").single(),
         supabase.from("feature_flags").select("*").order("label"),
+        supabase.rpc("admin_list_withdrawals", { p_status: "requested" }),
       ]);
     setApplications(apps ?? []);
     setPartnerApps(pApps ?? []);
     setReports(reps ?? []);
     setSettings(s);
     setFlags(f ?? []);
+    setWithdrawals((w as WithdrawalRequest[]) ?? []);
   }
 
   async function toggleFlag(key: string, enabled: boolean) {
@@ -78,46 +109,52 @@ export default function AdminPage() {
       .eq("key", key);
   }
 
-  async function searchUsers(e?: React.FormEvent) {
-    e?.preventDefault();
+  // Live search, WhatsApp-style: fires ~250ms after typing settles rather than
+  // waiting for a submit. admin_search_users is a SECURITY DEFINER RPC (admin
+  // gated server-side too) that can join auth.users, so it matches email as
+  // well as username/display name — the client can't query auth.users directly.
+  useEffect(() => {
     const q = userQuery.trim();
     if (!q) {
       setUserResults([]);
+      setUserSearchLoading(false);
       return;
     }
     setUserSearchLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, display_name, role, creator_status")
-      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .limit(20);
-    setUserResults((data as SearchedProfile[]) ?? []);
-    setUserSearchLoading(false);
-  }
+    const seq = ++userSearchSeq.current;
+    const handle = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("admin_search_users", { p_query: q });
+      if (seq !== userSearchSeq.current) return; // superseded by a newer keystroke
+      setUserResults(!error && data ? (data as SearchedProfile[]) : []);
+      setUserSearchLoading(false);
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [userQuery]);
 
   function patchUserResult(id: string, patch: Partial<SearchedProfile>) {
     setUserResults((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
   }
 
   async function setRole(u: SearchedProfile, role: UserRole) {
+    if (role === u.role) return; // already this role — toggle is a no-op
     setUserActionId(u.id);
     await supabase.from("profiles").update({ role }).eq("id", u.id);
     patchUserResult(u.id, { role });
     setUserActionId(null);
   }
 
-  async function makePartner(u: SearchedProfile) {
+  // Partner is a tier layered on top of role, not a role itself — an admin can
+  // also be a partner (as in your screenshot), so this never touches `role`.
+  async function togglePartner(u: SearchedProfile, isPartner: boolean) {
     setUserActionId(u.id);
-    await supabase
-      .from("profiles")
-      .update({ role: "creator", creator_status: "partner" })
-      .eq("id", u.id);
+    const creator_status = isPartner ? "partner" : "approved";
+    await supabase.from("profiles").update({ creator_status }).eq("id", u.id);
     await supabase.from("creator_partner_state").upsert({
       user_id: u.id,
-      is_partner: true,
-      partner_since: new Date().toISOString(),
+      is_partner: isPartner,
+      partner_since: isPartner ? new Date().toISOString() : null,
     });
-    patchUserResult(u.id, { role: "creator", creator_status: "partner" });
+    patchUserResult(u.id, { creator_status, is_partner: isPartner });
     setUserActionId(null);
   }
 
@@ -144,7 +181,10 @@ export default function AdminPage() {
       .eq("id", id);
 
     if (decision === "approved") {
-      await supabase.from("profiles").update({ creator_status: "approved" }).eq("id", userId);
+      await supabase
+        .from("profiles")
+        .update({ role: "creator", creator_status: "approved" })
+        .eq("id", userId);
     } else if (decision === "declined") {
       await supabase.from("profiles").update({ creator_status: "declined" }).eq("id", userId);
     }
@@ -162,10 +202,56 @@ export default function AdminPage() {
         .from("creator_partner_state")
         .update({ is_partner: true, partner_since: new Date().toISOString() })
         .eq("user_id", userId);
-      await supabase.from("profiles").update({ creator_status: "partner" }).eq("id", userId);
+      await supabase
+        .from("profiles")
+        .update({ role: "creator", creator_status: "partner" })
+        .eq("id", userId);
       await supabase.rpc("release_creator_escrow", { p_creator_id: userId });
     }
     loadAll();
+  }
+
+  async function approveWithdrawal(w: WithdrawalRequest) {
+    setWithdrawalError(null);
+    setWithdrawalActionId(w.id);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setWithdrawalError("Not signed in.");
+      setWithdrawalActionId(null);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/process-withdrawal`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ withdrawalId: w.id }),
+        }
+      );
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Transfer failed");
+      setWithdrawals((prev) => prev.filter((x) => x.id !== w.id));
+    } catch (e) {
+      setWithdrawalError((e as Error).message);
+    }
+    setWithdrawalActionId(null);
+  }
+
+  async function declineWithdrawal(w: WithdrawalRequest) {
+    setWithdrawalError(null);
+    setWithdrawalActionId(w.id);
+    const { data, error } = await supabase.rpc("admin_decline_withdrawal", {
+      p_withdrawal_id: w.id,
+    });
+    if (error || !data?.ok) {
+      setWithdrawalError(error?.message || data?.error || "Could not decline withdrawal");
+      setWithdrawalActionId(null);
+      return;
+    }
+    setWithdrawals((prev) => prev.filter((x) => x.id !== w.id));
+    setWithdrawalActionId(null);
   }
 
   async function saveSettings(e: React.FormEvent) {
@@ -184,6 +270,7 @@ export default function AdminPage() {
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "applications", label: "Creators", count: applications.length },
     { key: "partners", label: "Partner apps", count: partnerApps.length },
+    { key: "withdrawals", label: "Withdrawals", count: withdrawals.length },
     { key: "reports", label: "Reports", count: reports.length },
     { key: "links", label: "Links" },
     { key: "users", label: "Users" },
@@ -269,6 +356,64 @@ export default function AdminPage() {
         </ul>
       )}
 
+      {tab === "withdrawals" && (
+        <div className="mt-4 space-y-3">
+          <p className="text-[12px] text-muted">
+            Approve fires a real Paystack transfer to the creator's bank account. Decline returns
+            the held amount to their balance.
+          </p>
+          {withdrawalError && (
+            <p className="rounded-md bg-crimson-soft px-3 py-2 text-[13px] text-crimson">
+              {withdrawalError}
+            </p>
+          )}
+          <ul className="space-y-3">
+            {withdrawals.map((w) => (
+              <li key={w.id} className="rounded-md border border-border bg-surface p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-medium text-text">
+                      @{w.username}
+                      {w.display_name ? ` — ${w.display_name}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-muted">{w.email}</p>
+                  </div>
+                  <p className="font-display text-[17px] font-semibold text-text">
+                    ₦{Number(w.amount_naira).toLocaleString()}
+                  </p>
+                </div>
+                <p className="mt-2 text-[12px] text-muted">
+                  {w.bank_account_name} · {w.bank_account_number} · {w.bank_code}
+                </p>
+                <p className="mt-1 text-[11px] text-muted">
+                  Requested {new Date(w.requested_at).toLocaleString()}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={withdrawalActionId === w.id}
+                    onClick={() => approveWithdrawal(w)}
+                  >
+                    {withdrawalActionId === w.id ? "Processing…" : "Approve & pay out"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={withdrawalActionId === w.id}
+                    onClick={() => declineWithdrawal(w)}
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {!withdrawals.length && (
+            <p className="mt-6 text-center text-sm text-muted">No pending withdrawal requests.</p>
+          )}
+        </div>
+      )}
+
       {tab === "reports" && (
         <ul className="mt-4 space-y-3">
           {reports.map((r) => (
@@ -334,17 +479,13 @@ export default function AdminPage() {
 
       {tab === "users" && (
         <div className="mt-4 space-y-3">
-          <form onSubmit={searchUsers} className="flex gap-2">
-            <input
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Search by username or name"
-              className="h-11 w-full rounded-md border border-border bg-surface px-3 text-[14px] text-text"
-            />
-            <Button type="submit" size="md">
-              Search
-            </Button>
-          </form>
+          <input
+            value={userQuery}
+            onChange={(e) => setUserQuery(e.target.value)}
+            placeholder="Search by username, name, or email"
+            className="h-11 w-full rounded-md border border-border bg-surface px-3 text-[14px] text-text"
+            autoComplete="off"
+          />
 
           {userSearchLoading && <p className="text-[13px] text-muted">Searching…</p>}
 
@@ -355,54 +496,64 @@ export default function AdminPage() {
                   @{u.username}
                   {u.display_name ? ` — ${u.display_name}` : ""}
                 </p>
-                <p className="mt-1 text-[12px] text-muted">
-                  Role: {u.role} · Creator status: {u.creator_status}
+                <p className="mt-1 text-[12px] text-muted">{u.email}</p>
+
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Role
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {ROLE_OPTIONS.map((opt) => {
+                    const active = u.role === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        aria-pressed={active}
+                        disabled={userActionId === u.id}
+                        onClick={() => setRole(u, opt.key)}
+                        className={clsx(
+                          "rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-50",
+                          active
+                            ? "border-pink bg-pink/15 text-pink"
+                            : "border-border text-muted hover:text-text"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
+                  <div className="pr-3">
+                    <p className="text-[13px] font-medium text-text">Partner</p>
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      Revenue-share tier — independent of role
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={u.is_partner}
+                    aria-label="Partner"
                     disabled={userActionId === u.id}
-                    onClick={() => setRole(u, "creator")}
+                    onClick={() => togglePartner(u, !u.is_partner)}
+                    className={clsx(
+                      "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-50",
+                      u.is_partner ? "bg-pink" : "bg-border"
+                    )}
                   >
-                    Make creator
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={userActionId === u.id}
-                    onClick={() => makePartner(u)}
-                  >
-                    Make partner
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={userActionId === u.id}
-                    onClick={() => setRole(u, "staff")}
-                  >
-                    Make staff
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={userActionId === u.id}
-                    onClick={() => setRole(u, "admin")}
-                  >
-                    Make admin
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={userActionId === u.id}
-                    onClick={() => setRole(u, "viewer")}
-                  >
-                    Reset to viewer
-                  </Button>
+                    <span
+                      className={clsx(
+                        "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                        u.is_partner ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
                 </div>
               </li>
             ))}
-            {!userResults.length && !userSearchLoading && userQuery && (
+            {!userResults.length && !userSearchLoading && userQuery.trim() && (
               <p className="mt-6 text-center text-sm text-muted">No matching users.</p>
             )}
           </ul>
