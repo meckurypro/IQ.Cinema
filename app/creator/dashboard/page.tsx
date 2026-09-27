@@ -40,6 +40,16 @@ function unwrapEligibility(data: unknown): Eligibility | null {
   return (data as Eligibility) ?? null;
 }
 
+const TITLE_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  in_review: "In review",
+  published: "Live",
+  coming_soon: "Coming soon",
+  suspended: "Suspended",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+};
+
 function ProgressRow({ label, value, target }: { label: string; value: number; target: number }) {
   const safeValue = value ?? 0;
   const safeTarget = target ?? 0;
@@ -73,7 +83,7 @@ export default function CreatorDashboardPage() {
 
     supabase
       .from("titles")
-      .select("id, slug, title, status, total_unique_views")
+      .select("id, slug, title, status, genre, total_unique_views")
       .eq("creator_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -198,10 +208,13 @@ export default function CreatorDashboardPage() {
       <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
         {titles.map((t) => (
           <li key={t.id}>
-            <Link href={`/title/${t.slug}`} className="flex items-center justify-between px-4 py-3">
+            <Link href={`/creator/title/${t.id}`} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="text-[14px] font-medium text-text">{t.title}</p>
-                <p className="mt-0.5 text-[12px] capitalize text-muted">{t.status}</p>
+                <p className="mt-0.5 text-[12px] text-muted">
+                  {TITLE_STATUS_LABEL[t.status] ?? t.status}
+                  {t.genre ? ` · ${t.genre}` : ""}
+                </p>
               </div>
               <span className="flex items-center gap-1 text-[12px] text-muted">
                 <Zap size={11} className="fill-gold text-gold" />

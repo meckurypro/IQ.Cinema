@@ -11,7 +11,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
 
-type Tab = "applications" | "partners" | "reports" | "settings" | "links" | "users" | "withdrawals";
+type Tab =
+  | "applications"
+  | "partners"
+  | "projects"
+  | "reports"
+  | "settings"
+  | "links"
+  | "users"
+  | "withdrawals";
+
+type ReviewTitle = {
+  id: string;
+  title: string;
+  synopsis: string | null;
+  genre: string | null;
+  content_type: string;
+  poster_url: string | null;
+  review_ignored_at: string | null;
+  profiles: { username: string; display_name: string | null } | null;
+};
 
 type FeatureFlag = {
   key: string;
@@ -71,9 +90,12 @@ export default function AdminPage() {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
   const supabase = createClient();
-  const [tab, setTab] = useState<Tab>("applications");
+  const [tab, setTab] = useState<Tab>("projects");
   const [applications, setApplications] = useState<any[]>([]);
   const [partnerApps, setPartnerApps] = useState<any[]>([]);
+  const [reviewTitles, setReviewTitles] = useState<ReviewTitle[]>([]);
+  const [showIgnored, setShowIgnored] = useState(false);
+  const [titleActionId, setTitleActionId] = useState<string | null>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -89,7 +111,7 @@ export default function AdminPage() {
   const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
 
   async function loadAll() {
-    const [{ data: apps }, { data: pApps }, { data: reps }, { data: s }, { data: f }, { data: w }] =
+    const [{ data: apps }, { data: pApps }, { data: titles }, { data: reps }, { data: s }, { data: f }, { data: w }] =
       await Promise.all([
         supabase
           .from("creator_applications")
@@ -100,6 +122,13 @@ export default function AdminPage() {
           .select("*, profiles(username, display_name)")
           .eq("status", "pending"),
         supabase
+          .from("titles")
+          .select(
+            "id, title, synopsis, genre, content_type, poster_url, review_ignored_at, profiles!titles_creator_id_fkey(username, display_name)"
+          )
+          .eq("status", "in_review")
+          .order("created_at", { ascending: true }),
+        supabase
           .from("content_reports")
           .select("*, titles(title)")
           .eq("status", "pending"),
@@ -109,10 +138,38 @@ export default function AdminPage() {
       ]);
     setApplications(apps ?? []);
     setPartnerApps(pApps ?? []);
+    setReviewTitles(((titles as any[]) ?? []).map((t) => ({ ...t, profiles: Array.isArray(t.profiles) ? t.profiles[0] : t.profiles })));
     setReports(reps ?? []);
     setSettings(s);
     setFlags(f ?? []);
     setWithdrawals((w as WithdrawalRequest[]) ?? []);
+  }
+
+  async function reviewTitle(titleId: string, decision: "approved" | "declined" | "ignored") {
+    setTitleActionId(titleId);
+    const note =
+      decision === "declined"
+        ? window.prompt("Reason for declining (shown to the creator):") ?? undefined
+        : undefined;
+    if (decision === "declined" && note === undefined) {
+      setTitleActionId(null);
+      return; // creator cancelled the prompt
+    }
+    const { data, error } = await supabase.rpc("admin_review_title", {
+      p_title_id: titleId,
+      p_decision: decision,
+      p_note: note || null,
+    });
+    if (!error && data?.ok) {
+      if (decision === "ignored") {
+        setReviewTitles((prev) =>
+          prev.map((t) => (t.id === titleId ? { ...t, review_ignored_at: new Date().toISOString() } : t))
+        );
+      } else {
+        setReviewTitles((prev) => prev.filter((t) => t.id !== titleId));
+      }
+    }
+    setTitleActionId(null);
   }
 
   async function toggleFlag(key: string, enabled: boolean) {
@@ -299,7 +356,11 @@ export default function AdminPage() {
     return null;
   }
 
+  const pendingReviewTitles = reviewTitles.filter((t) => !t.review_ignored_at);
+  const ignoredReviewTitles = reviewTitles.filter((t) => t.review_ignored_at);
+
   const tabs: { key: Tab; label: string; count?: number }[] = [
+    { key: "projects", label: "Projects", count: pendingReviewTitles.length },
     { key: "applications", label: "Creators", count: applications.length },
     { key: "partners", label: "Partner apps", count: partnerApps.length },
     { key: "withdrawals", label: "Withdrawals", count: withdrawals.length },
@@ -327,6 +388,70 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {tab === "projects" && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] text-muted">
+              Approve makes the project (and its finalized episodes) live. Decline sends it back to
+              the creator with a note. Ignore leaves it in review for now — revisit anytime.
+            </p>
+          </div>
+          <ul className="space-y-3">
+            {(showIgnored ? ignoredReviewTitles : pendingReviewTitles).map((t) => (
+              <li key={t.id} className="rounded-md border border-border bg-surface p-3.5">
+                <p className="text-[14px] font-medium text-text">{t.title}</p>
+                <p className="mt-0.5 text-[12px] text-muted">
+                  {t.genre ?? "No genre"} · {t.content_type.replace(/_/g, " ")}
+                  {t.profiles?.username ? ` · by @${t.profiles.username}` : ""}
+                </p>
+                {t.synopsis && <p className="mt-1.5 text-[13px] text-muted">{t.synopsis}</p>}
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={titleActionId === t.id}
+                    onClick={() => reviewTitle(t.id, "approved")}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={titleActionId === t.id}
+                    onClick={() => reviewTitle(t.id, "declined")}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={titleActionId === t.id}
+                    onClick={() => reviewTitle(t.id, "ignored")}
+                  >
+                    Ignore
+                  </Button>
+                </div>
+              </li>
+            ))}
+            {!(showIgnored ? ignoredReviewTitles : pendingReviewTitles).length && (
+              <p className="mt-6 text-center text-sm text-muted">
+                {showIgnored ? "Nothing ignored." : "No projects awaiting review."}
+              </p>
+            )}
+          </ul>
+          {ignoredReviewTitles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowIgnored((v) => !v)}
+              className="text-[12px] font-medium text-muted underline underline-offset-2"
+            >
+              {showIgnored
+                ? "Back to pending review"
+                : `Show ignored (${ignoredReviewTitles.length})`}
+            </button>
+          )}
+        </div>
+      )}
 
       {tab === "applications" && (
         <ul className="mt-4 space-y-3">
