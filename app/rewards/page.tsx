@@ -8,12 +8,16 @@ import Link from "next/link";
 import { Zap, Gift, Flame, Users, Wallet, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { Skeleton } from "@/components/ui/Skeleton";
 import clsx from "clsx";
 
 export default function RewardsPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const { wallet, loading: walletLoading } = useWallet(user?.id);
+  const { display: balanceDisplay, changed: balanceChanged } = useAnimatedNumber(
+    wallet?.coin_balance
+  );
 
   const isCreator = profile?.role === "creator" || profile?.creator_status === "partner";
 
@@ -34,9 +38,14 @@ export default function RewardsPage() {
           {walletLoading || authLoading ? (
             <Skeleton className="mt-2 h-8 w-24" />
           ) : (
-            <p className="mt-1 flex items-center gap-1.5 font-display text-2xl font-semibold text-text">
+            <p
+              className={clsx(
+                "mt-1 flex origin-left items-center gap-1.5 font-display text-2xl font-semibold tabular-nums text-text",
+                balanceChanged && "coin-pop"
+              )}
+            >
               <Zap size={20} className="fill-gold text-gold" />
-              {wallet?.coin_balance?.toLocaleString() ?? 0}
+              {balanceDisplay.toLocaleString()}
             </p>
           )}
         </div>
@@ -53,6 +62,7 @@ export default function RewardsPage() {
         <div className="space-y-2">
           <RewardRow
             tone="crimson"
+            pulse
             icon={<Flame size={18} className="text-crimson" />}
             title="Daily streak"
             description="Open IQ Cinema every day to build your streak and unlock bonus coins."
@@ -113,11 +123,13 @@ function RewardRow({
   title,
   description,
   tone = "gold",
+  pulse = false,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   tone?: "gold" | "pink" | "crimson";
+  pulse?: boolean;
 }) {
   const toneBg = {
     gold: "bg-gold-soft",
@@ -127,7 +139,13 @@ function RewardRow({
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border bg-surface p-3.5">
-      <div className={clsx("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full", toneBg)}>
+      <div
+        className={clsx(
+          "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+          toneBg,
+          pulse && "pulse-glow"
+        )}
+      >
         {icon}
       </div>
       <div>
