@@ -24,6 +24,7 @@ export function VideoPlayer({
   synopsis,
   onOpenDetails,
   actionRail,
+  backButton,
   onTimeUpdate,
   onEnded,
 }: {
@@ -33,11 +34,13 @@ export function VideoPlayer({
   synopsis?: string | null;
   onOpenDetails?: () => void;
   actionRail?: React.ReactNode;
+  backButton?: React.ReactNode;
   onTimeUpdate?: (seconds: number) => void;
   onEnded?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const lastPreviewSeekAt = useRef(0);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
@@ -54,7 +57,6 @@ export function VideoPlayer({
   const [dragging, setDragging] = useState(false);
   const [iconPulse, setIconPulse] = useState(0);
   const [scrubTime, setScrubTime] = useState(0);
-  const [scrubPct, setScrubPct] = useState(0);
   // { side, seconds } keyed by a counter so retapping the same side while
   // the flash is mid-animation restarts it instead of being ignored.
   const [seekFlash, setSeekFlash] = useState<{ side: "left" | "right"; key: number } | null>(null);
@@ -160,8 +162,18 @@ export function VideoPlayer({
     v.currentTime = time;
     updateProgressUI(time, v.duration);
     setScrubTime(time);
-    setScrubPct(fraction * 100);
-    if (previewVideoRef.current) previewVideoRef.current.currentTime = time;
+
+    // Throttle how often the preview twin is re-seeked: firing a new seek
+    // on every pointermove aborts the in-flight range request for the
+    // previous one before it ever resolves, so the canvas never gets past
+    // its first frame. Giving each seek ~150ms to actually land lets
+    // 'seeked' fire reliably and the preview keep pace with the drag.
+    const pv = previewVideoRef.current;
+    const now = performance.now();
+    if (pv && now - lastPreviewSeekAt.current > 150) {
+      lastPreviewSeekAt.current = now;
+      pv.currentTime = time;
+    }
   }
 
   function handleBarPointerMove(e: React.PointerEvent) {
@@ -173,10 +185,6 @@ export function VideoPlayer({
     setDragging(false);
     scheduleHide();
   }
-
-  // Clamp the floating preview box so it never runs past the player edges,
-  // independent of where the scrub thumb itself sits at 0%/100%.
-  const previewLeftPct = Math.min(88, Math.max(12, scrubPct));
 
   return (
     <div className="relative h-full w-full select-none bg-black">
@@ -205,14 +213,20 @@ export function VideoPlayer({
       />
 
       {/* Off-screen twin, seeked independently, used only to grab
-          scrub-preview frames without disturbing visible playback. */}
+          scrub-preview frames without disturbing visible playback. Needs a
+          real (if tiny) rendered size — some mobile browsers stop decoding
+          video frames entirely once an element is 0x0 or display:none, which
+          is what made the preview canvas go permanently black after the
+          first frame. Positioned fixed + off-screen instead keeps decoding
+          alive without showing anything. */}
       <video
         ref={previewVideoRef}
         src={src}
         muted
         playsInline
-        preload="metadata"
-        className="pointer-events-none absolute h-0 w-0 opacity-0"
+        preload="auto"
+        className="pointer-events-none fixed left-[-9999px] top-0 opacity-0"
+        style={{ width: PREVIEW_W, height: PREVIEW_H }}
         onSeeked={drawPreviewFrame}
       />
 
@@ -263,6 +277,18 @@ export function VideoPlayer({
         </button>
       </div>
 
+      {/* Back button — same show/hide behavior as every other overlay. */}
+      {backButton && (
+        <div
+          className={clsx(
+            "transition-opacity duration-200",
+            showControls ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
+        >
+          {backButton}
+        </div>
+      )}
+
       {/* Action rail (save/comments/share/episodes) — fades with the rest
           of the controls layer instead of staying pinned on screen. */}
       {actionRail && (
@@ -280,8 +306,7 @@ export function VideoPlayer({
           actively dragging the time bar. */}
       {dragging && (
         <div
-          className="pointer-events-none absolute z-30 flex -translate-x-1/2 flex-col items-center gap-1.5"
-          style={{ left: `${previewLeftPct}%`, bottom: "calc(env(safe-area-inset-bottom, 0px) + 66px)" }}
+          className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2"
         >
           <canvas
             ref={previewCanvasRef}
