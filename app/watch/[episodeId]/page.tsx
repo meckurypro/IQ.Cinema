@@ -10,6 +10,7 @@ import { ArrowLeft, Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
 import { useAuth } from "@/hooks/useAuth";
+import { useUnlockedEpisodeIds } from "@/hooks/useUnlockedEpisodes";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
@@ -67,6 +68,7 @@ export default function WatchPage() {
   // Real viewing time for the view-count rule, tracked separately from the
   // playhead: dragging the bar to 75% must not count as having watched 75%.
   const watchedRef = useRef(0); // seconds actually played this session
+  const savingRef = useRef(false); // one save/unsave request at a time
   const lastPlayheadRef = useRef<number | null>(null);
   const lastReportedRef = useRef(0); // watchedRef value at the last report
 
@@ -83,7 +85,7 @@ export default function WatchPage() {
   // Episode tray: the full episode list for this title, plus which of them
   // this viewer has paid to unlock (free-by-count ones don't need an entry).
   const [trayEpisodes, setTrayEpisodes] = useState<TrayEpisode[]>([]);
-  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
+  const unlockedIds = useUnlockedEpisodeIds(trayEpisodes.map((e) => e.id));
 
   // Free-by-count episodes are already granted for free by the
   // unlock_episode RPC itself — this is just so the UI can show that up
@@ -156,8 +158,7 @@ export default function WatchPage() {
     if (episodeId) load();
   }, [episodeId, user, supabase]);
 
-  // Episode tray data: every published episode of this title, plus which
-  // ones this viewer has already paid to unlock.
+  // Episode tray data: every published episode of this title.
   useEffect(() => {
     async function loadTray() {
       if (!episode?.title_id) return;
@@ -168,23 +169,9 @@ export default function WatchPage() {
         .eq("status", "published")
         .order("episode_number", { ascending: true });
       setTrayEpisodes(eps ?? []);
-
-      if (user && eps?.length) {
-        const { data: unlocks } = await supabase
-          .from("episode_unlocks")
-          .select("episode_id")
-          .eq("user_id", user.id)
-          .in(
-            "episode_id",
-            eps.map((e) => e.id)
-          );
-        setUnlockedIds(new Set((unlocks ?? []).map((u) => u.episode_id)));
-      } else {
-        setUnlockedIds(new Set());
-      }
     }
     loadTray();
-  }, [episode?.title_id, user, supabase]);
+  }, [episode?.title_id, supabase]);
 
   // Free episodes need no coin/subscription decision from the viewer — grant
   // them automatically the moment we know both that it's free and that the
@@ -310,19 +297,40 @@ export default function WatchPage() {
       router.push("/auth/login");
       return;
     }
+    // A second tap while the first is still in flight would send an
+    // insert and a delete at the same time, and the database could end up
+    // disagreeing with the icon.
+    if (savingRef.current) return;
+    savingRef.current = true;
+
     const next = !saved;
     setSaved(next);
     setSaveCount((c) => Math.max(0, c + (next ? 1 : -1)));
 
-    const { error: err } = next
-      ? await supabase.from("episode_saves").insert({ user_id: user.id, episode_id: episode.id })
-      : await supabase
-          .from("episode_saves")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("episode_id", episode.id);
+    let failed = false;
+    try {
+      // ON CONFLICT DO NOTHING: a stale "not saved" view can't fail on the
+      // primary key, and the count trigger only fires on a real insert.
+      const { error: err } = next
+        ? await supabase
+            .from("episode_saves")
+            .upsert(
+              { user_id: user.id, episode_id: episode.id },
+              { onConflict: "user_id,episode_id", ignoreDuplicates: true }
+            )
+        : await supabase
+            .from("episode_saves")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("episode_id", episode.id);
+      failed = !!err;
+    } catch {
+      failed = true;
+    } finally {
+      savingRef.current = false; // never leave the button locked
+    }
 
-    if (err) {
+    if (failed) {
       setSaved(!next);
       setSaveCount((c) => Math.max(0, c + (next ? -1 : 1)));
     }

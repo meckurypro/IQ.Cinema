@@ -2,13 +2,15 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, BellRing, Bookmark, Play } from "lucide-react";
+import { Bell, BellRing, Bookmark, ChevronRight, ListVideo, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
+import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
+import { useUnlockedEpisodeIds } from "@/hooks/useUnlockedEpisodes";
 
 const supabase = createClient();
 
@@ -18,22 +20,43 @@ export function TitleActions({
   titleId,
   slug,
   status,
-  firstEpisodeId,
+  episodes,
+  freeCount,
+  defaultCost,
 }: {
   titleId: string;
   slug: string;
   status: string;
-  firstEpisodeId: string | null;
+  // Published episodes, in order. Feeds both "Watch now" (the first one) and
+  // the shared episode tray, so there is a single source for both.
+  episodes: TrayEpisode[];
+  freeCount: number;
+  defaultCost: number;
 }) {
   const router = useRouter();
   const { user } = useAuth();
   const [following, setFollowing] = useState(false);
   const [reminded, setReminded] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // A ref, not state: two taps in the same frame both see the old state value
+  // and would both get past a state-based guard.
+  const busyRef = useRef(false);
+  // The viewer's tap is newer than the initial state lookup, so a slow lookup
+  // answering afterwards must not undo it.
+  const touched = useRef({ following: false, reminded: false });
   const [error, setError] = useState<string | null>(null);
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [trayLoaded, setTrayLoaded] = useState(false);
+  // Which episodes this viewer has paid to unlock — only looked up once the
+  // tray has actually been opened, so it costs nothing on page load.
+  const unlockedIds = useUnlockedEpisodeIds(
+    episodes.map((e) => e.id),
+    trayLoaded
+  );
+  const firstEpisodeId = episodes[0]?.id ?? null;
   const upcoming = status === "coming_soon";
 
   useEffect(() => {
+    touched.current = { following: false, reminded: false };
     if (!user) {
       setFollowing(false);
       setReminded(false);
@@ -43,8 +66,8 @@ export function TitleActions({
     supabase.rpc("get_title_user_state", { p_title_id: titleId }).then(({ data }) => {
       if (ignore) return;
       const row = Array.isArray(data) ? data[0] : data;
-      setFollowing(!!row?.is_following);
-      setReminded(!!row?.has_reminder);
+      if (!touched.current.following) setFollowing(!!row?.is_following);
+      if (!touched.current.reminded) setReminded(!!row?.has_reminder);
     });
     return () => {
       ignore = true;
@@ -57,38 +80,46 @@ export function TitleActions({
 
   async function toggleFollow() {
     if (!user) return requireAuth();
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
+    touched.current.following = true;
     const next = !following;
-    setBusy(true);
     setError(null);
     setFollowing(next);
-    const { error: rpcError } = await supabase.rpc("set_titles_follow", {
-      p_title_ids: [titleId],
-      p_follow: next,
-    });
-    if (rpcError) {
+    try {
+      const { error: rpcError } = await supabase.rpc("set_titles_follow", {
+        p_title_ids: [titleId],
+        p_follow: next,
+      });
+      if (rpcError) throw rpcError;
+    } catch {
       setFollowing(!next);
       setError("Couldn't update your list. Try again.");
+    } finally {
+      busyRef.current = false; // never leave the button locked
     }
-    setBusy(false);
   }
 
   async function toggleReminder() {
     if (!user) return requireAuth();
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
+    touched.current.reminded = true;
     const next = !reminded;
-    setBusy(true);
     setError(null);
     setReminded(next);
-    const { error: rpcError } = await supabase.rpc("set_title_reminders", {
-      p_title_ids: [titleId],
-      p_on: next,
-    });
-    if (rpcError) {
+    try {
+      const { error: rpcError } = await supabase.rpc("set_title_reminders", {
+        p_title_ids: [titleId],
+        p_on: next,
+      });
+      if (rpcError) throw rpcError;
+    } catch {
       setReminded(!next);
       setError("Couldn't update your reminder. Try again.");
+    } finally {
+      busyRef.current = false;
     }
-    setBusy(false);
   }
 
   if (upcoming) {
@@ -131,7 +162,37 @@ export function TitleActions({
           </span>
         </Button>
       </div>
+
+      {/* Episodes live in the same tray the player uses — one list, one place. */}
+      {episodes.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setTrayLoaded(true);
+            setTrayOpen(true);
+          }}
+          className="mt-3 flex w-full items-center justify-between rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors active:bg-surface-raised"
+        >
+          <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
+            <ListVideo size={18} className="text-muted" />
+            Episodes
+          </span>
+          <ChevronRight size={18} className="text-muted" />
+        </button>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No episodes published yet.</p>
+      )}
+
       {error && <p className="mt-2 text-[12px] text-crimson">{error}</p>}
+
+      <EpisodeTray
+        open={trayOpen}
+        onClose={() => setTrayOpen(false)}
+        episodes={episodes}
+        freeCount={freeCount}
+        unlockedIds={unlockedIds}
+        defaultCost={defaultCost}
+      />
     </div>
   );
 }
