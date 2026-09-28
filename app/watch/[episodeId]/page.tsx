@@ -373,7 +373,7 @@ export default function WatchPage() {
         <VideoPlayer
           src={videoUrl ?? undefined}
           autoPlay
-          title={titleData?.title}
+          title={titleData?.title ? `(Ep ${episode.episode_number}) ${titleData.title}` : undefined}
           synopsis={titleData?.synopsis}
           onOpenDetails={openDetails}
           backButton={backButton}

@@ -49,6 +49,9 @@ export function VideoPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapSide = useRef<"left" | "right" | null>(null);
+  const draggingRef = useRef(false);
+  const wasPlayingRef = useRef(false);
+  const scrubTimeRef = useRef(0);
 
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(true);
@@ -145,10 +148,18 @@ export function VideoPlayer({
     ctx.drawImage(pv, sx, sy, sw, sh, 0, 0, PREVIEW_W, PREVIEW_H);
   }
 
-  function handleBarPointerDown(e: React.PointerEvent) {
+  // While the finger is down we only move the progress UI and the preview
+  // frame. The real video is paused and seeked exactly once on release —
+  // firing a seek on every pointermove aborts each in-flight range request
+  // and leaves the element stuck in a permanent loading state.
+  function handleBarPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const v = videoRef.current;
+    draggingRef.current = true;
+    wasPlayingRef.current = !!v && !v.paused;
+    if (v && !v.paused) v.pause();
     setDragging(true);
     clearHideTimer();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
     scrubTo(e.clientX);
   }
 
@@ -159,30 +170,35 @@ export function VideoPlayer({
     const rect = bar.getBoundingClientRect();
     const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     const time = fraction * v.duration;
-    v.currentTime = time;
+    scrubTimeRef.current = time;
     updateProgressUI(time, v.duration);
     setScrubTime(time);
 
-    // Throttle how often the preview twin is re-seeked: firing a new seek
-    // on every pointermove aborts the in-flight range request for the
-    // previous one before it ever resolves, so the canvas never gets past
-    // its first frame. Giving each seek ~150ms to actually land lets
-    // 'seeked' fire reliably and the preview keep pace with the drag.
+    // Throttled, and never while the previous preview seek is still in
+    // flight, so 'seeked' fires reliably and the preview keeps pace.
     const pv = previewVideoRef.current;
     const now = performance.now();
-    if (pv && now - lastPreviewSeekAt.current > 150) {
+    if (pv && !pv.seeking && now - lastPreviewSeekAt.current > 200) {
       lastPreviewSeekAt.current = now;
       pv.currentTime = time;
     }
   }
 
-  function handleBarPointerMove(e: React.PointerEvent) {
-    if (!dragging) return;
+  function handleBarPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current) return;
     scrubTo(e.clientX);
   }
 
   function handleBarPointerUp() {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
     setDragging(false);
+    const v = videoRef.current;
+    if (v) {
+      setBuffering(true);
+      v.currentTime = scrubTimeRef.current;
+      if (wasPlayingRef.current) v.play().catch(() => {});
+    }
     scheduleHide();
   }
 
@@ -203,6 +219,7 @@ export function VideoPlayer({
         onWaiting={() => setBuffering(true)}
         onPlaying={() => setBuffering(false)}
         onCanPlay={() => setBuffering(false)}
+        onSeeked={() => setBuffering(false)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           const t = e.currentTarget.currentTime;
@@ -302,25 +319,6 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Scrub preview: floating 9:16 frame + timestamp, shown only while
-          actively dragging the time bar. */}
-      {dragging && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2"
-        >
-          <canvas
-            ref={previewCanvasRef}
-            width={PREVIEW_W}
-            height={PREVIEW_H}
-            className="rounded-md border border-white/25 bg-black shadow-card"
-            style={{ width: PREVIEW_W, height: PREVIEW_H }}
-          />
-          <span className="rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
-            {formatTime(scrubTime)} / {formatTime(duration)}
-          </span>
-        </div>
-      )}
-
       {/* Bottom panel: title/synopsis, then progress bar + time */}
       <div
         className={clsx(
@@ -330,6 +328,26 @@ export function VideoPlayer({
         )}
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
+        {/* Scrub preview: floating 9:16 frame + timestamp, shown only while
+            actively dragging, sitting just above the title. */}
+        {dragging && (
+          <div
+            className="pointer-events-none absolute left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2"
+            style={{ bottom: "calc(100% - 20px)" }}
+          >
+            <canvas
+              ref={previewCanvasRef}
+              width={PREVIEW_W}
+              height={PREVIEW_H}
+              className="rounded-md border border-white/25 bg-black shadow-card"
+              style={{ width: PREVIEW_W, height: PREVIEW_H }}
+            />
+            <span className="rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
+              {formatTime(scrubTime)} / {formatTime(duration)}
+            </span>
+          </div>
+        )}
+
         {(title || synopsis) && (
           <button
             type="button"
@@ -353,7 +371,13 @@ export function VideoPlayer({
         )}
 
         <div className="flex items-center gap-2.5">
-          <span ref={currentTimeRef} className="min-w-[34px] text-[11px] font-medium text-white/90">
+          <span
+            ref={currentTimeRef}
+            className={clsx(
+              "min-w-[34px] text-[11px] font-medium transition-all duration-150",
+              dragging ? "scale-110 text-white" : "text-white/90"
+            )}
+          >
             0:00
           </span>
           <div
@@ -362,26 +386,40 @@ export function VideoPlayer({
             onPointerMove={handleBarPointerMove}
             onPointerUp={handleBarPointerUp}
             onPointerCancel={handleBarPointerUp}
-            className="relative flex flex-1 touch-none items-center py-2"
+            className="relative flex h-6 flex-1 touch-none items-center"
           >
             <div
               className={clsx(
-                "w-full overflow-hidden rounded-full bg-white/25 transition-all",
-                dragging ? "h-1.5" : "h-1"
+                "w-full overflow-hidden rounded-full transition-all duration-150",
+                dragging ? "h-2.5 bg-white/60" : "h-1 bg-white/25"
               )}
             >
-              <div ref={fillRef} className="h-full rounded-full bg-pink" style={{ width: "0%" }} />
+              <div
+                ref={fillRef}
+                className={clsx(
+                  "h-full rounded-full bg-pink transition-[filter] duration-150",
+                  dragging && "brightness-125 saturate-150"
+                )}
+                style={{ width: "0%" }}
+              />
             </div>
             <div
               ref={thumbRef}
               className={clsx(
-                "absolute rounded-full bg-white shadow-card transition-transform",
-                dragging ? "h-4 w-4 -translate-x-1/2 scale-125" : "h-3 w-3 -translate-x-1/2"
+                "absolute rounded-full bg-white shadow-card transition-all duration-150",
+                dragging
+                  ? "h-5 w-5 -translate-x-1/2 ring-4 ring-pink/60"
+                  : "h-3 w-3 -translate-x-1/2"
               )}
               style={{ left: "0%" }}
             />
           </div>
-          <span className="min-w-[34px] text-right text-[11px] font-medium text-white/90">
+          <span
+            className={clsx(
+              "min-w-[34px] text-right text-[11px] font-medium transition-all duration-150",
+              dragging ? "scale-110 text-white" : "text-white/90"
+            )}
+          >
             {formatTime(duration)}
           </span>
         </div>
