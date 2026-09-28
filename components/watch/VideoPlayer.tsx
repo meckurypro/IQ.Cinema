@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Play, Pause, Loader2, RotateCcw, RotateCw } from "lucide-react";
 import clsx from "clsx";
 import { SB_FRAME_H, SB_FRAME_W, storyboardLayout } from "@/lib/storyboard";
@@ -321,8 +321,38 @@ export function VideoPlayer({
     scheduleHide();
   }
 
+  // The action rail lines up with the movie title: its Episodes icon sits level
+  // with (or just above) the title text. The title's height above the bottom
+  // edge depends on how many synopsis lines there are, so measure it and hand
+  // the result to the rail as --rail-bottom.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const apply = () => {
+      const t = titleRef.current;
+      let bottom = 96; // no title: sit just above the seek bar
+      if (t) {
+        const r = root.getBoundingClientRect();
+        const tr = t.getBoundingClientRect();
+        const titleCenterFromBottom = r.bottom - (tr.top + tr.height / 2);
+        // Episodes button: 36px icon + 2px gap + 12px label. Its icon centre
+        // is ~32px above the rail's bottom edge; +8 puts it slightly above
+        // the title's centre line.
+        bottom = Math.max(96, Math.round(titleCenterFromBottom - 32 + 8));
+      }
+      root.style.setProperty("--rail-bottom", `${bottom}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(root);
+    if (titleRef.current?.parentElement) ro.observe(titleRef.current.parentElement);
+    return () => ro.disconnect();
+  }, [title, synopsis]);
+
   return (
-    <div className="relative h-full w-full select-none bg-black">
+    <div ref={rootRef} className="relative h-full w-full select-none bg-black">
       <video
         ref={videoRef}
         className="h-full w-full object-contain"
@@ -484,7 +514,10 @@ export function VideoPlayer({
             className="pointer-events-auto mb-11 max-w-[72%] text-left"
           >
             {title && (
-              <p className="text-[16px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
+              <p
+                ref={titleRef}
+                className="text-[16px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
+              >
                 {title}
               </p>
             )}

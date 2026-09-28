@@ -63,6 +63,8 @@ function getConfig(ct: ContentType) {
 
 function slugify(s: string) {
   return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
@@ -239,13 +241,15 @@ export default function UploadPage() {
       posterUrl = data.publicUrl;
     }
 
-    const slug = `${slugify(titleName)}-${crypto.randomUUID().slice(0, 6)}`;
+    // Clean slug from the title alone: it is the public link (/title/<slug>).
+    // The database re-derives it and enforces that titles are unique.
+    const slug = slugify(titleName) || crypto.randomUUID().slice(0, 8);
 
     const { data: title, error: insertError } = await supabase
       .from("titles")
       .insert({
         creator_id: user.id,
-        title: titleName,
+        title: titleName.trim(),
         slug,
         synopsis,
         content_type: contentType,
@@ -261,7 +265,11 @@ export default function UploadPage() {
     setSaving(null);
 
     if (insertError || !title) {
-      setError(insertError?.message ?? "Could not create title");
+      setError(
+        insertError?.code === "23505"
+          ? "A title with this name already exists. Titles must be unique, so please choose a different name."
+          : insertError?.message ?? "Could not create title"
+      );
       return;
     }
 

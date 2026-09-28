@@ -160,7 +160,11 @@ export default function ManageTitlePage() {
 
     setSavingDetails(false);
     if (updErr) {
-      setError(updErr.message);
+      setError(
+        updErr.code === "23505"
+          ? "A title with this name already exists. Titles must be unique, so please choose a different name."
+          : updErr.message
+      );
       return;
     }
     setEditing(false);

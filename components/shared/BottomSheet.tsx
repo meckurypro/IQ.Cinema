@@ -4,6 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 
+// Sheets take over the browser/phone Back button while open: opening pushes a
+// history entry, Back pops it and closes the sheet (the page underneath stays).
+// Links inside a sheet that navigate away call markSheetNavigating() first and
+// use router replace, so the sheet's own entry is swapped for the destination
+// instead of being popped with history.back() mid-navigation.
+let sheetNavigating = false;
+export function markSheetNavigating() {
+  sheetNavigating = true;
+}
+
 // Drag-to-dismiss bottom sheet. Pointer events only (no gesture library) —
 // this is the one interaction on mobile where a snap-back animation
 // genuinely needs to react to velocity, not just distance, so it's worth
@@ -31,6 +41,29 @@ export function BottomSheet({
   // Portal target only exists client-side.
   useEffect(() => setMounted(true), []);
 
+  const runCloseRef = useRef<() => void>(() => {});
+
+  // Back button closes the sheet instead of leaving the page.
+  useEffect(() => {
+    if (!open) return;
+    const marker = `sheet-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.history.pushState({ ...(window.history.state ?? {}), __sheet: marker }, "", window.location.href);
+    const onPop = () => {
+      if (window.history.state?.__sheet !== marker) runCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      const stillOnOurEntry = window.history.state?.__sheet === marker;
+      if (sheetNavigating) {
+        sheetNavigating = false;
+      } else if (stillOnOurEntry) {
+        // Closed by tap/drag (not Back): drop the entry we added.
+        window.history.back();
+      }
+    };
+  }, [open]);
+
   // Lock background scroll while the sheet is up.
   useEffect(() => {
     if (!open) return;
@@ -42,6 +75,7 @@ export function BottomSheet({
   }, [open]);
 
   function runClose() {
+    if (closing) return;
     setClosing(true);
     setTimeout(() => {
       setClosing(false);
@@ -49,6 +83,8 @@ export function BottomSheet({
       onClose();
     }, 200);
   }
+
+  runCloseRef.current = runClose;
 
   function handlePointerDown(e: React.PointerEvent) {
     // Only the drag handle / header should start a drag, so text selection

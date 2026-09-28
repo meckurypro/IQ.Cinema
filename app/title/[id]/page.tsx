@@ -1,22 +1,63 @@
 // app/title/[id]/page.tsx
 
+import { cache } from "react";
+import type { Metadata } from "next";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TitleActions } from "@/components/title/TitleActions";
 import { formatEpisodeCount } from "@/lib/format";
+import { UUID_RE, stripLegacySlugSuffix, titlePath } from "@/lib/links";
 
-async function getTitle(slug: string) {
+const TITLE_COLS =
+  "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, status, total_unique_views, free_episode_count";
+
+// The URL segment is the title's slug (derived from the unique movie title).
+// A raw id or an old suffixed slug (still-standing-b34779) still resolves, and
+// the page redirects to the clean /title/<slug>.
+const findTitle = cache(async (param: string) => {
   const supabase = createClient();
+  const bySlug = await supabase.from("titles").select(TITLE_COLS).eq("slug", param).maybeSingle();
+  if (bySlug.data) return bySlug.data;
+  if (UUID_RE.test(param)) {
+    const byId = await supabase.from("titles").select(TITLE_COLS).eq("id", param).maybeSingle();
+    if (byId.data) return byId.data;
+  }
+  const stripped = stripLegacySlugSuffix(param);
+  if (stripped) {
+    const legacy = await supabase.from("titles").select(TITLE_COLS).eq("slug", stripped).maybeSingle();
+    if (legacy.data) return legacy.data;
+  }
+  return null;
+});
 
-  const { data: title } = await supabase
-    .from("titles")
-    .select(
-      "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, status, total_unique_views, free_episode_count"
-    )
-    .eq("slug", slug)
-    .single();
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const title = await findTitle(params.id);
+  if (!title) return {};
+  const description = title.synopsis ?? `Watch ${title.title} on IQ Cinema.`;
+  const image = title.banner_url ?? title.poster_url;
+  return {
+    title: `${title.title} | IQ Cinema`,
+    description,
+    openGraph: {
+      title: title.title,
+      description,
+      siteName: "IQ Cinema",
+      type: "video.tv_show",
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: title.title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
 
+async function getTitle(param: string) {
+  const supabase = createClient();
+  const title = await findTitle(param);
   if (!title) return null;
 
   const { data: episodes } = await supabase
@@ -37,6 +78,7 @@ async function getTitle(slug: string) {
 export default async function TitlePage({ params }: { params: { id: string } }) {
   const data = await getTitle(params.id);
   if (!data) notFound();
+  if (data.title.slug !== params.id) permanentRedirect(titlePath(data.title.slug));
 
   const { title, episodes, settings } = data;
   const freeCount = title.free_episode_count ?? settings?.default_free_episodes ?? 4;
