@@ -67,6 +67,26 @@ async function getHomeData({ tab, genre }: SearchParams) {
     .limit(1)
     .maybeSingle();
 
+  // Tapping a poster from Home goes straight into episode 1 — no summary
+  // page in between — so every card needs to know its title's first
+  // published episode. One query covering every title on the page, reduced
+  // to the lowest episode_number per title_id.
+  const allTitleIds = Array.from(
+    new Set([featured?.id, exclusive?.id, ...(gridTitles ?? []).map((t) => t.id)].filter((id): id is string => !!id))
+  );
+  const firstEpisodeByTitle = new Map<string, string>();
+  if (allTitleIds.length) {
+    const { data: firstEpisodes } = await supabase
+      .from("episodes")
+      .select("id, title_id, episode_number")
+      .in("title_id", allTitleIds)
+      .eq("status", "published")
+      .order("episode_number", { ascending: true });
+    for (const ep of firstEpisodes ?? []) {
+      if (!firstEpisodeByTitle.has(ep.title_id)) firstEpisodeByTitle.set(ep.title_id, ep.id);
+    }
+  }
+
   return {
     featured,
     exclusive,
@@ -74,6 +94,7 @@ async function getHomeData({ tab, genre }: SearchParams) {
     genres,
     heading,
     activeTab,
+    firstEpisodeByTitle,
   };
 }
 
@@ -82,9 +103,8 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { featured, exclusive, gridTitles, genres, heading, activeTab } = await getHomeData(
-    searchParams
-  );
+  const { featured, exclusive, gridTitles, genres, heading, activeTab, firstEpisodeByTitle } =
+    await getHomeData(searchParams);
 
   return (
     <HomeRefresh>
@@ -100,13 +120,27 @@ export default async function HomePage({
           <HeroBanner
             featured={
               featured
-                ? { ...featured, genre_label: featured.genre ?? null }
+                ? {
+                    ...featured,
+                    genre_label: featured.genre ?? null,
+                    first_episode_id: firstEpisodeByTitle.get(featured.id) ?? null,
+                  }
                 : null
             }
-            exclusive={exclusive}
+            exclusive={
+              exclusive
+                ? { ...exclusive, first_episode_id: firstEpisodeByTitle.get(exclusive.id) ?? null }
+                : null
+            }
           />
 
-          <PopularGrid heading={heading} titles={gridTitles} />
+          <PopularGrid
+            heading={heading}
+            titles={gridTitles.map((t) => ({
+              ...t,
+              first_episode_id: firstEpisodeByTitle.get(t.id) ?? null,
+            }))}
+          />
 
           {!featured && !gridTitles.length && (
             <div className="mt-16 px-6 text-center">

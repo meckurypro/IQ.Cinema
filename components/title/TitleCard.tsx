@@ -13,6 +13,10 @@ export type TitleCardData = {
   total_unique_views: number;
   is_exclusive: boolean;
   genre_label?: string;
+  // Tapping the card goes straight into episode 1's player, skipping the
+  // synopsis/"Watch now" gate — falls back to the title page when a title
+  // has no published episodes yet.
+  first_episode_id?: string | null;
 };
 
 function formatViews(n: number) {
@@ -24,8 +28,10 @@ function formatViews(n: number) {
 export function TitleCard({ title, size = "md" }: { title: TitleCardData; size?: "sm" | "md" }) {
   const width = size === "sm" ? "w-28" : "w-36";
 
+  const href = title.first_episode_id ? `/watch/${title.first_episode_id}` : `/title/${title.slug}`;
+
   return (
-    <Link href={`/title/${title.slug}`} className={clsx("shrink-0 group", width)}>
+    <Link href={href} className={clsx("shrink-0 group", width)}>
       <div className="relative aspect-[9/16] overflow-hidden rounded-md bg-surface-raised">
         {title.poster_url ? (
           <Image
