@@ -7,7 +7,15 @@ type HeroTitle = {
   poster_url: string | null;
   banner_url: string | null;
   genre_label?: string | null;
+  // Tapping the poster goes straight into episode 1's player, skipping the
+  // synopsis/"Watch now" gate — falls back to the title page for a title
+  // with no published episodes yet (e.g. coming soon).
+  first_episode_id?: string | null;
 };
+
+function heroHref(t: HeroTitle) {
+  return t.first_episode_id ? `/watch/${t.first_episode_id}` : `/title/${t.slug}`;
+}
 
 export function HeroBanner({
   featured,
@@ -21,7 +29,7 @@ export function HeroBanner({
   return (
     <div className="mt-4 flex gap-2 px-4">
       <Link
-        href={`/title/${featured.slug}`}
+        href={heroHref(featured)}
         className="relative aspect-[9/16] flex-[2] overflow-hidden rounded-lg bg-surface-raised"
       >
         {(featured.banner_url ?? featured.poster_url) && (
@@ -47,7 +55,7 @@ export function HeroBanner({
 
       {exclusive && (
         <Link
-          href={`/title/${exclusive.slug}`}
+          href={heroHref(exclusive)}
           className="relative aspect-[9/16] flex-1 overflow-hidden rounded-lg bg-surface-raised"
         >
           {(exclusive.banner_url ?? exclusive.poster_url) && (

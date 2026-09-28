@@ -6,11 +6,16 @@ export type PopularCardData = {
   slug: string;
   title: string;
   poster_url: string | null;
+  // Tapping the card goes straight into episode 1's player, skipping the
+  // synopsis/"Watch now" gate — falls back to the title page when a title
+  // has no published episodes yet.
+  first_episode_id?: string | null;
 };
 
 export function PopularCard({ title, rank }: { title: PopularCardData; rank: number }) {
+  const href = title.first_episode_id ? `/watch/${title.first_episode_id}` : `/title/${title.slug}`;
   return (
-    <Link href={`/title/${title.slug}`} className="group block">
+    <Link href={href} className="group block">
       <div className="relative aspect-[9/16] overflow-hidden rounded-lg bg-surface-raised">
         {title.poster_url ? (
           <Image

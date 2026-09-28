@@ -23,11 +23,10 @@ function formatTime(seconds: number) {
 export function VideoPlayer({
   src,
   autoPlay,
-  title,
-  synopsis,
-  onOpenDetails,
+  speed = 1,
+  posterUrl,
   actionRail,
-  backButton,
+  topBar,
   onTimeUpdate,
   onEnded,
   onRequestFreshSrc,
@@ -35,11 +34,12 @@ export function VideoPlayer({
 }: {
   src: string | undefined;
   autoPlay?: boolean;
-  title?: string;
-  synopsis?: string | null;
-  onOpenDetails?: () => void;
+  // Applied to the element as playbackRate — the Speed sheet in the top bar
+  // controls this from the parent so it survives across re-renders.
+  speed?: number;
+  posterUrl?: string;
   actionRail?: React.ReactNode;
-  backButton?: React.ReactNode;
+  topBar?: React.ReactNode;
   onTimeUpdate?: (seconds: number) => void;
   onEnded?: () => void;
   // Returns a brand-new (e.g. re-signed) URL; used to recover a stalled or
@@ -193,6 +193,14 @@ export function VideoPlayer({
 
   useEffect(() => clearStallTimer, []);
 
+  // Keep the element's rate in sync with the Speed sheet. Re-applied on
+  // every change (and once metadata is known) since some browsers reset
+  // playbackRate across a src swap during stream recovery.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.playbackRate = speed;
+  }, [speed, src]);
+
   function clearHideTimer() {
     if (hideTimer.current) clearTimeout(hideTimer.current);
   }
@@ -313,6 +321,7 @@ export function VideoPlayer({
         autoPlay={autoPlay}
         playsInline
         preload="auto"
+        poster={posterUrl}
         src={src}
         onPlay={() => setPlaying(true)}
         onPause={() => {
@@ -390,17 +399,30 @@ export function VideoPlayer({
         </button>
       </div>
 
-      {/* Back button — same show/hide behavior as every other overlay. */}
-      {backButton && (
+      {/* Top bar (back + EP badge + speed/more) — same show/hide behavior
+          as every other overlay. */}
+      {topBar && (
         <div
           className={clsx(
             "transition-opacity duration-200",
             showControls ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         >
-          {backButton}
+          {topBar}
         </div>
       )}
+
+      {/* App-icon watermark, bottom-right. Deliberately NOT tied to
+          showControls — it stays visible whether or not the control layer
+          is faded, sitting in the gap between the seek bar and the action
+          rail so it never collides with either. */}
+      <img
+        src="/watermark.png"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3.5 z-10 h-8 w-8 select-none rounded-md opacity-55"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)" }}
+      />
 
       {/* Action rail (save/comments/share/episodes) — fades with the rest
           of the controls layer instead of staying pinned on screen. */}
@@ -442,28 +464,6 @@ export function VideoPlayer({
               {formatTime(scrubTime)} / {formatTime(duration)}
             </span>
           </div>
-        )}
-
-        {(title || synopsis) && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDetails?.();
-            }}
-            className="pointer-events-auto max-w-[78%] text-left"
-          >
-            {title && (
-              <p className="text-[15px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
-                {title}
-              </p>
-            )}
-            {synopsis && (
-              <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
-                {synopsis}
-              </p>
-            )}
-          </button>
         )}
 
         <div className="flex items-center gap-2.5">
