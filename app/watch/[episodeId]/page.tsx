@@ -4,7 +4,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -209,6 +209,16 @@ export default function WatchPage() {
     resolveSignedUrl();
   }, [unlocked, episode?.video_url, supabase]);
 
+  // Fresh signed URL for the player to fall back on if a stream stalls or
+  // the original link has expired.
+  const refreshVideoUrl = useCallback(async () => {
+    if (!episode?.video_url) return undefined;
+    const { data } = await supabase.storage
+      .from("videos")
+      .createSignedUrl(episode.video_url, 60 * 60);
+    return data?.signedUrl;
+  }, [episode?.video_url, supabase]);
+
   // View counts move server-side as people watch; the copy fetched at page
   // load goes stale, so refresh it whenever the details sheet is opened.
   async function openDetails() {
@@ -376,6 +386,7 @@ export default function WatchPage() {
           title={titleData?.title ? `(Ep ${episode.episode_number}) ${titleData.title}` : undefined}
           synopsis={titleData?.synopsis}
           onOpenDetails={openDetails}
+          onRequestFreshSrc={refreshVideoUrl}
           backButton={backButton}
           onTimeUpdate={reportProgress}
           onEnded={() => reportProgress(episode.duration_seconds ?? lastPlayheadRef.current ?? 0, true)}
