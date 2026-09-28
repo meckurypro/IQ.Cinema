@@ -43,21 +43,16 @@ export function TitleDetailsSheet({
 
   const load = useCallback(async () => {
     if (!titleId) return;
-    const [{ data: genreRows }, { data: similarRows }] = await Promise.all([
+    const [{ data: titleRow }, { data: genreRows }, { data: similarRows }] = await Promise.all([
+      supabase.from("titles").select("genre").eq("id", titleId).single(),
       supabase.from("title_genres").select("genres(name)").eq("title_id", titleId),
-      supabase
-        .from("titles")
-        .select("id, slug, title, poster_url")
-        .eq("status", "published")
-        .neq("id", titleId)
-        .order("total_unique_views", { ascending: false })
-        .limit(8),
+      supabase.rpc("similar_titles", { p_title_id: titleId, p_limit: 8 }),
     ]);
-    setTags(
-      ((genreRows ?? []) as unknown as { genres: { name: string } | null }[])
-        .map((r) => r.genres?.name)
-        .filter((n): n is string => !!n)
-    );
+    // Primary genre first, then the creator's extra tags, no duplicates.
+    const extra = ((genreRows ?? []) as unknown as { genres: { name: string } | null }[])
+      .map((r) => r.genres?.name)
+      .filter((n): n is string => !!n);
+    setTags(Array.from(new Set([titleRow?.genre, ...extra].filter((n): n is string => !!n))));
     setSimilar((similarRows as SimilarTitle[]) ?? []);
   }, [titleId, supabase]);
 
@@ -114,7 +109,7 @@ export function TitleDetailsSheet({
         ) : null}
 
         <div>
-          <h4 className="mb-2 text-[14px] font-semibold text-text">Similar titles</h4>
+          <h4 className="mb-2 text-[14px] font-semibold text-text">More like this</h4>
           {similar === null ? (
             <div className="flex gap-2.5 overflow-x-auto">
               {[1, 2, 3].map((i) => (

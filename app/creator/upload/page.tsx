@@ -13,6 +13,7 @@ import { uploadVideoResumable } from "@/lib/supabase/resumableUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
+import { TagPicker } from "@/components/creator/TagPicker";
 
 // ---------------------------------------------------------------------------
 // Content-type config: duration cap (seconds) + what an upload "unit" is called
@@ -147,6 +148,7 @@ export default function UploadPage() {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genre, setGenre] = useState("");
+  const [extraTags, setExtraTags] = useState<string[]>([]);
   const [contentRating, setContentRating] = useState<ContentRating>("13+");
 
   // episode/part fields (step 2)
@@ -252,6 +254,18 @@ export default function UploadPage() {
     if (insertError || !title) {
       setError(insertError?.message ?? "Could not create title");
       return;
+    }
+
+    // Extra tags are best-effort: the title already exists, so a tag hiccup
+    // shouldn't block the creator from moving on — they can re-pick later
+    // from Edit details.
+    if (extraTags.length) {
+      const { data: gRows } = await supabase.from("genres").select("id, name").in("name", extraTags);
+      if (gRows?.length) {
+        await supabase
+          .from("title_genres")
+          .insert(gRows.map((g) => ({ title_id: title.id, genre_id: g.id })));
+      }
     }
 
     setTitleId(title.id);
@@ -469,7 +483,10 @@ export default function UploadPage() {
           <select
             required
             value={genre}
-            onChange={(e) => setGenre(e.target.value)}
+            onChange={(e) => {
+              setGenre(e.target.value);
+              setExtraTags((t) => t.filter((x) => x !== e.target.value));
+            }}
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text"
           >
             <option value="" disabled>
@@ -481,6 +498,9 @@ export default function UploadPage() {
               </option>
             ))}
           </select>
+          {genre && (
+            <TagPicker options={genres} primary={genre} selected={extraTags} onChange={setExtraTags} />
+          )}
           <select
             required
             value={contentRating}
