@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Wallet, Bell, LogOut, Film, Camera } from "lucide-react";
+import { ChevronRight, Wallet, Bell, LogOut, Film, Camera, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -177,6 +177,12 @@ export default function ProfilePage() {
         <Link href="/wallet" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
             <Wallet size={17} className="text-muted" /> Wallet & subscriptions
+          </span>
+          <ChevronRight size={16} className="text-muted" />
+        </Link>
+        <Link href="/downloads" className="flex items-center justify-between px-4 py-3.5">
+          <span className="flex items-center gap-2.5 text-[14px] text-text">
+            <Download size={17} className="text-muted" /> Downloads
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>

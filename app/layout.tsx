@@ -5,10 +5,12 @@ import "@/styles/globals.css";
 import { ThemeScript } from "@/components/shared/ThemeScript";
 import { BottomNav } from "@/components/shared/BottomNav";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "IQ Cinema",
   description: "Watch and support independent film and series creators.",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/IQCinemaIcon.png",
     apple: "/IQCinemaIcon.png",
@@ -40,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             any number of components (layouts, pages, both at once) to call
             useAuth() without each one opening its own duplicate realtime
             subscription. See hooks/useAuth.tsx for why that mattered. */}
+        <ServiceWorkerRegister />
         <AuthProvider>
           <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
             <main className="flex-1 pb-20">{children}</main>
