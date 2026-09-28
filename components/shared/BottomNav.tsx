@@ -36,21 +36,6 @@ export function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <ul className="relative flex items-stretch justify-between px-1">
-        {/* Slides to whichever tab is active instead of the color swap being
-            the only signal — a moving element reads as "the app followed
-            your tap" in a way an instant color change doesn't. */}
-        {activeIndex >= 0 && (
-          <div
-            className="pointer-events-none absolute inset-y-0 py-1.5 transition-transform duration-300 ease-out"
-            style={{
-              width: `${100 / items.length}%`,
-              transform: `translateX(${activeIndex * 100}%)`,
-            }}
-          >
-            <div className="h-full w-full rounded-2xl bg-pink/10" />
-          </div>
-        )}
-
         {items.map(({ href, label, icon: Icon }, i) => {
           const active = i === activeIndex;
 
@@ -58,7 +43,7 @@ export function BottomNav() {
             <li key={href} className="relative flex-1">
               <Link
                 href={href}
-                className="flex flex-col items-center gap-0.5 rounded-md py-2 text-[11.5px] transition-colors active:bg-pink/10"
+                className="flex flex-col items-center gap-0.5 rounded-md py-2 text-[11.5px] transition-colors"
               >
                 <span key={active ? `${href}-active` : href} className={clsx(active && "coin-pop")}>
                   <Icon
