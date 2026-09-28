@@ -12,11 +12,13 @@ import { createClient } from "@/lib/supabase/client";
 import { uploadVideoResumable } from "@/lib/supabase/resumableUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
+import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
 
 // ---------------------------------------------------------------------------
 // Content-type config: duration cap (seconds) + what an upload "unit" is called
 // ---------------------------------------------------------------------------
 type ContentType = "short_episode" | "full_episode" | "one_part_film";
+
 
 const CONTENT_TYPES: {
   value: ContentType;
@@ -145,6 +147,7 @@ export default function UploadPage() {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genre, setGenre] = useState("");
+  const [contentRating, setContentRating] = useState<ContentRating>("13+");
 
   // episode/part fields (step 2)
   const [episodeRowId, setEpisodeRowId] = useState<string | null>(null); // set once a row exists
@@ -238,6 +241,7 @@ export default function UploadPage() {
         content_type: contentType,
         poster_url: posterUrl,
         genre: genre || null,
+        content_rating: contentRating,
         status: "draft",
       })
       .select()
@@ -474,6 +478,18 @@ export default function UploadPage() {
             {genres.map((g) => (
               <option key={g} value={g}>
                 {g}
+              </option>
+            ))}
+          </select>
+          <select
+            required
+            value={contentRating}
+            onChange={(e) => setContentRating(e.target.value as ContentRating)}
+            className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text"
+          >
+            {CONTENT_RATINGS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
               </option>
             ))}
           </select>

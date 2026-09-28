@@ -28,14 +28,14 @@ function RailButton({
     >
       <span
         className={clsx(
-          "flex h-10 w-10 items-center justify-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]",
+          "flex h-12 w-12 items-center justify-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]",
           active && "scale-105"
         )}
       >
         {icon}
       </span>
       {count !== undefined && (
-        <span className="text-[12px] font-semibold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_0.6)]">
+        <span className="text-[13px] font-semibold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_0.6)]">
           {formatCount(count)}
         </span>
       )}
@@ -66,30 +66,30 @@ export function ActionRail({
 }) {
   return (
     <div
-      className="pointer-events-none absolute right-3 z-20 flex flex-col items-center gap-5"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)" }}
+      className="pointer-events-none absolute right-3 z-20 flex flex-col items-center gap-6"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 124px)" }}
     >
       <RailButton
-        icon={<Bookmark size={30} className={saved ? "fill-gold text-gold" : "text-white"} />}
+        icon={<Bookmark size={40} className={saved ? "fill-gold text-gold" : "text-white"} />}
         count={saveCount}
         active={saved}
         label={saved ? "Remove from My List" : "Save to My List"}
         onClick={onToggleSave}
       />
       <RailButton
-        icon={<MessageCircle size={29} className="text-white" />}
+        icon={<MessageCircle size={38} className="text-white" />}
         count={commentCount}
         label="View comments"
         onClick={onOpenComments}
       />
       <RailButton
-        icon={<Redo2 size={29} className="text-white" />}
+        icon={<Redo2 size={38} className="text-white" />}
         count={shareCount}
         label="Share"
         onClick={onShare}
       />
       <RailButton
-        icon={<ListVideo size={28} className="text-white" />}
+        icon={<ListVideo size={38} className="text-white" />}
         label={`Episode ${episodeNumber} — episode list`}
         onClick={onOpenEpisodes}
       />

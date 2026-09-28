@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
 import clsx from "clsx";
 
 type TitleStatus =
@@ -39,6 +40,7 @@ type TitleRow = {
   slug: string;
   synopsis: string | null;
   genre: string | null;
+  content_rating: ContentRating | null;
   poster_url: string | null;
   content_type: string;
   status: TitleStatus;
@@ -81,6 +83,7 @@ export default function ManageTitlePage() {
   const [editTitle, setEditTitle] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editGenre, setEditGenre] = useState("");
+  const [editContentRating, setEditContentRating] = useState<ContentRating>("13+");
   const [editPosterFile, setEditPosterFile] = useState<File | null>(null);
   const [savingDetails, setSavingDetails] = useState(false);
 
@@ -89,7 +92,7 @@ export default function ManageTitlePage() {
       supabase
         .from("titles")
         .select(
-          "id, title, slug, synopsis, genre, poster_url, content_type, status, creator_id, admin_review_note, reviewed_at, review_ignored_at, total_unique_views"
+          "id, title, slug, synopsis, genre, content_rating, poster_url, content_type, status, creator_id, admin_review_note, reviewed_at, review_ignored_at, total_unique_views"
         )
         .eq("id", id)
         .single(),
@@ -105,6 +108,7 @@ export default function ManageTitlePage() {
       setEditTitle(t.title);
       setEditSynopsis(t.synopsis ?? "");
       setEditGenre(t.genre ?? "");
+      setEditContentRating((t.content_rating as ContentRating) ?? "13+");
     }
     setLoading(false);
   }
@@ -144,6 +148,7 @@ export default function ManageTitlePage() {
         title: editTitle,
         synopsis: editSynopsis || null,
         genre: editGenre || null,
+        content_rating: editContentRating,
         poster_url: posterUrl,
       })
       .eq("id", title.id);
@@ -230,6 +235,11 @@ export default function ManageTitlePage() {
         <span className={clsx("rounded-full px-2.5 py-1 text-[11px] font-semibold", meta.className)}>
           {meta.label}
         </span>
+        {title.content_rating && (
+          <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+            {title.content_rating}
+          </span>
+        )}
         {title.genre && <span className="text-[12px] text-muted">{title.genre}</span>}
       </div>
 
@@ -285,6 +295,17 @@ export default function ManageTitlePage() {
             {genres.map((g) => (
               <option key={g} value={g}>
                 {g}
+              </option>
+            ))}
+          </select>
+          <select
+            value={editContentRating}
+            onChange={(e) => setEditContentRating(e.target.value as ContentRating)}
+            className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
+          >
+            {CONTENT_RATINGS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
               </option>
             ))}
           </select>

@@ -33,6 +33,7 @@ type TitleData = {
   title: string;
   synopsis: string | null;
   content_rating: string | null;
+  poster_url: string | null;
   total_unique_views: number;
   free_episode_count: number | null;
   save_count: number;
@@ -105,7 +106,7 @@ export default function WatchPage() {
         const [{ data: t }, { data: settings }] = await Promise.all([
           supabase
             .from("titles")
-            .select("title, synopsis, content_rating, total_unique_views, free_episode_count, save_count")
+            .select("title, synopsis, content_rating, poster_url, total_unique_views, free_episode_count, save_count")
             .eq("id", ep.title_id)
             .single(),
           supabase
@@ -197,6 +198,19 @@ export default function WatchPage() {
     }
     resolveSignedUrl();
   }, [unlocked, episode?.video_url, supabase]);
+
+  // View counts move server-side as people watch; the copy fetched at page
+  // load goes stale, so refresh it whenever the details sheet is opened.
+  async function openDetails() {
+    setShowDetails(true);
+    if (!episode) return;
+    const { data } = await supabase
+      .from("titles")
+      .select("total_unique_views, synopsis, content_rating")
+      .eq("id", episode.title_id)
+      .single();
+    if (data) setTitleData((t) => (t ? { ...t, ...data } : t));
+  }
 
   async function handleUnlock() {
     if (!user) {
@@ -315,16 +329,20 @@ export default function WatchPage() {
     );
   }
 
+  const backButton = (
+    <button
+      onClick={() => router.back()}
+      aria-label="Back"
+      className="absolute left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white"
+      style={{ top: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
+    >
+      <ArrowLeft size={18} />
+    </button>
+  );
+
   return (
     <div className="relative h-dvh bg-black">
-      <button
-        onClick={() => router.back()}
-        aria-label="Back"
-        className="absolute left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white"
-        style={{ top: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
-      >
-        <ArrowLeft size={18} />
-      </button>
+      {!unlocked && <div className="relative z-10">{backButton}</div>}
 
       {unlocked ? (
         <VideoPlayer
@@ -332,7 +350,8 @@ export default function WatchPage() {
           autoPlay
           title={titleData?.title}
           synopsis={titleData?.synopsis}
-          onOpenDetails={() => setShowDetails(true)}
+          onOpenDetails={openDetails}
+          backButton={backButton}
           onTimeUpdate={reportProgress}
           onEnded={() => episode.duration_seconds && reportProgress(episode.duration_seconds)}
           actionRail={
@@ -431,6 +450,7 @@ export default function WatchPage() {
         synopsis={titleData?.synopsis ?? null}
         views={titleData?.total_unique_views ?? 0}
         contentRating={titleData?.content_rating}
+        posterUrl={titleData?.poster_url}
       />
     </div>
   );

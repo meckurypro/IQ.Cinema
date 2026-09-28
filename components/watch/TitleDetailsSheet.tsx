@@ -26,6 +26,7 @@ export function TitleDetailsSheet({
   synopsis,
   views,
   contentRating,
+  posterUrl,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,7 @@ export function TitleDetailsSheet({
   synopsis: string | null;
   views: number;
   contentRating?: string | null;
+  posterUrl?: string | null;
 }) {
   const supabase = createClient();
   const [tags, setTags] = useState<string[] | null>(null);
@@ -72,15 +74,26 @@ export function TitleDetailsSheet({
   return (
     <BottomSheet open={open} onClose={onClose} title="Details">
       <div className="flex flex-col gap-4 px-3 pb-3 pt-1">
-        <div>
-          <h3 className="font-display text-[17px] font-semibold text-text">{title}</h3>
-          <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
-            <Eye size={13} />
-            {formatCount(views)} views
-            {contentRating ? ` · ${contentRating}` : ""}
-          </p>
-          {synopsis && <p className="mt-3 text-[14px] leading-relaxed text-text/85">{synopsis}</p>}
+        <div className="flex gap-3">
+          {posterUrl && (
+            <div className="relative aspect-[3/4] w-[88px] shrink-0 overflow-hidden rounded-md bg-surface-raised">
+              <Image src={posterUrl} alt={title} fill sizes="88px" className="object-cover" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-[17px] font-semibold text-text">{title}</h3>
+            <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
+              <Eye size={13} />
+              {formatCount(views)} views
+            </p>
+            {contentRating && (
+              <span className="mt-2 inline-block rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+                {contentRating}
+              </span>
+            )}
+          </div>
         </div>
+        {synopsis && <p className="text-[14px] leading-relaxed text-text/85">{synopsis}</p>}
 
         {tags === null ? (
           <div className="flex gap-2">
