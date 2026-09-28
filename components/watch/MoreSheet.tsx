@@ -7,7 +7,6 @@ import Link from "next/link";
 import { Check, ChevronRight, Download, MonitorPlay, Pause, Play, RotateCw } from "lucide-react";
 import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 import { ProgressRing } from "@/components/downloads/ProgressRing";
-import { formatBytes } from "@/lib/format";
 import type { OfflineEpisode } from "@/lib/offline/db";
 
 // Every episode is stored as a single rendition today (see video_width /
@@ -111,11 +110,6 @@ export function MoreSheet({
                 <Download size={18} className="text-muted" />
                 {status === "queued" ? "Waiting to download…" : `Downloading${fraction >= 0 ? ` ${Math.floor(fraction * 100)}%` : "…"}`}
               </span>
-              {downloadState.totalBytes > 0 && (
-                <span className="ml-[30px] mt-0.5 text-[12px] text-muted">
-                  {formatBytes(downloadState.receivedBytes)} of {formatBytes(downloadState.totalBytes)}
-                </span>
-              )}
             </span>
             <button type="button" onClick={onPauseDownload} aria-label="Pause download">
               <ProgressRing progress={fraction} size={34}>
@@ -156,9 +150,7 @@ export function MoreSheet({
                   <Check size={18} className="text-gold" />
                   Downloaded
                 </span>
-                <span className="ml-[30px] mt-0.5 text-[12px] text-muted">
-                  {formatBytes(downloadState.totalBytes)} · View in Downloads
-                </span>
+                <span className="ml-[30px] mt-0.5 text-[12px] text-muted">View in Downloads</span>
               </span>
               <ChevronRight size={16} className="text-muted" />
             </Link>

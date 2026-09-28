@@ -12,7 +12,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, SquarePen } from "lucide-react";
 import { useOfflineDownloads } from "@/hooks/useOfflineDownloads";
-import { formatBytes, formatEpisodeCount } from "@/lib/format";
+import { formatEpisodeCount } from "@/lib/format";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -115,8 +115,8 @@ function DownloadsInner() {
       {dl.ready && total > 0 && (
         <p className="-mt-2 text-[13px] text-muted">
           {folder
-            ? `${formatEpisodeCount(folder.episodes.length)} · ${formatBytes(folder.bytes)}`
-            : `${dl.folders.length} ${dl.folders.length === 1 ? "movie" : "movies"} · ${formatBytes(dl.totalBytes)} on this device`}
+            ? formatEpisodeCount(folder.episodes.length)
+            : `${dl.folders.length} ${dl.folders.length === 1 ? "movie" : "movies"}`}
         </p>
       )}
 

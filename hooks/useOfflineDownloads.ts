@@ -13,7 +13,6 @@ export type DownloadFolder = {
   episodes: OfflineEpisode[];
   completeCount: number;
   activeCount: number;
-  bytes: number;
   lastAdded: number;
 };
 
@@ -49,7 +48,6 @@ export function useOfflineDownloads() {
         episodes,
         completeCount: episodes.filter((e) => e.status === "complete").length,
         activeCount: episodes.filter((e) => e.status === "downloading" || e.status === "queued").length,
-        bytes: episodes.reduce((sum, e) => sum + (e.status === "complete" ? e.totalBytes : e.receivedBytes), 0),
         lastAdded: Math.max(...episodes.map((e) => e.addedAt)),
       });
     }
@@ -65,7 +63,6 @@ export function useOfflineDownloads() {
     ready: snap.ready,
     folders,
     episodes: snap.episodes,
-    totalBytes: folders.reduce((s, f) => s + f.bytes, 0),
     episodeState,
     download: (ep: EpisodeDownloadInput, title: TitleDownloadInput) => offlineManager.download(ep, title),
     pause: (id: string) => offlineManager.pause(id),

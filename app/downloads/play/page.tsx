@@ -14,7 +14,6 @@ import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { PlayerTopBar } from "@/components/watch/PlayerTopBar";
 import { SpeedSheet } from "@/components/watch/SpeedSheet";
 import { BottomSheet } from "@/components/shared/BottomSheet";
-import { formatBytes } from "@/lib/format";
 import clsx from "clsx";
 
 function OfflinePlayer() {
@@ -132,7 +131,6 @@ function OfflinePlayer() {
               )}
             >
               <span>EP.{e.episodeNumber}</span>
-              <span className="text-[12.5px] font-normal text-muted">{formatBytes(e.totalBytes)}</span>
             </button>
           ))}
           <button
