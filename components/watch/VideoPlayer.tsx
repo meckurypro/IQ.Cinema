@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Loader2, RotateCcw, RotateCw } from "lucide-react";
 import clsx from "clsx";
-import { useStoryboard } from "@/hooks/useStoryboard";
+import { SB_FRAME_H, SB_FRAME_W, storyboardLayout } from "@/lib/storyboard";
 
 const AUTO_HIDE_MS = 3000;
 const DOUBLE_TAP_MS = 280;
 const SEEK_SECONDS = 10;
 const PREVIEW_W = 90;
 const PREVIEW_H = 160;
-const STALL_MS = 7000;
-const MAX_RECOVERIES = 3;
+const STALL_MS = 8000;
+const MAX_RECOVERIES = 2;
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -31,6 +31,7 @@ export function VideoPlayer({
   onTimeUpdate,
   onEnded,
   onRequestFreshSrc,
+  storyboardUrl,
 }: {
   src: string | undefined;
   autoPlay?: boolean;
@@ -44,6 +45,8 @@ export function VideoPlayer({
   // Returns a brand-new (e.g. re-signed) URL; used to recover a stalled or
   // expired stream.
   onRequestFreshSrc?: () => Promise<string | undefined>;
+  // One JPEG sprite sheet of preview frames (see lib/storyboard.ts).
+  storyboardUrl?: string | null;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,6 +63,9 @@ export function VideoPlayer({
   const stallTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveries = useRef(0);
   const recovering = useRef(false);
+  const stallStage = useRef(0);
+  const pendingSeek = useRef<number | null>(null);
+  const spriteRef = useRef<HTMLImageElement | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(true);
@@ -68,29 +74,49 @@ export function VideoPlayer({
   const [dragging, setDragging] = useState(false);
   const [iconPulse, setIconPulse] = useState(0);
   const [scrubTime, setScrubTime] = useState(0);
+  const [spriteReady, setSpriteReady] = useState(false);
   // { side, seconds } keyed by a counter so retapping the same side while
   // the flash is mid-animation restarts it instead of being ignored.
   const [seekFlash, setSeekFlash] = useState<{ side: "left" | "right"; key: number } | null>(null);
 
-  const { getFrame } = useStoryboard({
-    src,
-    duration,
-    isMainBusy: () => {
-      const v = videoRef.current;
-      return draggingRef.current || (!!v && !v.paused && v.readyState < 3);
-    },
-  });
+  // Preload the storyboard sprite once. It is a single small image, so
+  // scrubbing never touches the video file at all.
+  useEffect(() => {
+    spriteRef.current = null;
+    setSpriteReady(false);
+    if (!storyboardUrl) return;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      spriteRef.current = img;
+      setSpriteReady(true);
+    };
+    img.src = storyboardUrl;
+    return () => {
+      img.onload = null;
+    };
+  }, [storyboardUrl]);
 
-  // Paint the nearest pre-captured frame into the preview box. Nothing is
-  // decoded live while scrubbing, so this is instant and never goes black
-  // once the storyboard has started filling in.
+  // Paint the frame nearest `time` out of the sprite into the preview box.
   function drawPreview(time: number) {
     const canvas = previewCanvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const frame = getFrame(time);
-    if (frame) {
-      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    const img = spriteRef.current;
+    if (img && duration) {
+      const L = storyboardLayout(duration);
+      const i = Math.min(L.count - 1, Math.max(0, Math.round(time / L.interval)));
+      ctx.drawImage(
+        img,
+        (i % L.cols) * L.frameW,
+        Math.floor(i / L.cols) * L.frameH,
+        L.frameW,
+        L.frameH,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
     } else {
       ctx.fillStyle = "#111";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -100,22 +126,35 @@ export function VideoPlayer({
   useEffect(() => {
     if (dragging) drawPreview(scrubTime);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, scrubTime]);
+  }, [dragging, scrubTime, spriteReady]);
 
   function clearStallTimer() {
     if (stallTimer.current) clearTimeout(stallTimer.current);
     stallTimer.current = null;
   }
 
-  // If the element is still starved STALL_MS after a seek / buffering
-  // event, rebuild the stream at the same position with a fresh URL rather
-  // than leaving the person staring at a spinner until they refresh.
+  function markHealthy() {
+    clearStallTimer();
+    stallStage.current = 0;
+    pendingSeek.current = null;
+    setBuffering(false);
+  }
+
+  // Two-stage recovery if the element is still starved STALL_MS after a
+  // seek / buffering event: first re-issue the seek at the same spot; if
+  // that also fails, rebuild the stream there with a freshly signed URL.
   function armStallWatchdog() {
     clearStallTimer();
     stallTimer.current = setTimeout(() => {
       const v = videoRef.current;
       if (!v || (v.readyState >= 3 && !v.seeking)) {
-        setBuffering(false);
+        markHealthy();
+        return;
+      }
+      if (stallStage.current === 0) {
+        stallStage.current = 1;
+        v.currentTime = pendingSeek.current ?? v.currentTime;
+        armStallWatchdog();
         return;
       }
       void recoverStream();
@@ -128,7 +167,7 @@ export function VideoPlayer({
     recovering.current = true;
     recoveries.current += 1;
     const resume = !v.paused || wasPlayingRef.current;
-    const at = scrubTimeRef.current || v.currentTime || 0;
+    const at = pendingSeek.current ?? v.currentTime ?? 0;
     try {
       let url = v.currentSrc || src;
       if (onRequestFreshSrc) {
@@ -145,6 +184,7 @@ export function VideoPlayer({
       v.addEventListener("loadedmetadata", onMeta);
       v.src = url;
       v.load();
+      stallStage.current = 1; // a failed reload goes straight to giving up
       armStallWatchdog();
     } finally {
       recovering.current = false;
@@ -179,7 +219,9 @@ export function VideoPlayer({
   function seekBy(seconds: number, side: "left" | "right") {
     const v = videoRef.current;
     if (!v) return;
-    v.currentTime = Math.min(Math.max(0, v.currentTime + seconds), v.duration || Infinity);
+    const target = Math.min(Math.max(0, v.currentTime + seconds), v.duration || Infinity);
+    pendingSeek.current = target;
+    v.currentTime = target;
     armStallWatchdog();
     setSeekFlash({ side, key: Date.now() });
     updateProgressUI(v.currentTime, v.duration);
@@ -255,6 +297,7 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (v) {
       setBuffering(true);
+      pendingSeek.current = scrubTimeRef.current;
       v.currentTime = scrubTimeRef.current;
       if (wasPlayingRef.current) v.play().catch(() => {});
       armStallWatchdog();
@@ -282,18 +325,11 @@ export function VideoPlayer({
           armStallWatchdog();
         }}
         onPlaying={() => {
-          setBuffering(false);
-          clearStallTimer();
+          markHealthy();
           recoveries.current = 0;
         }}
-        onCanPlay={() => {
-          setBuffering(false);
-          clearStallTimer();
-        }}
-        onSeeked={() => {
-          setBuffering(false);
-          clearStallTimer();
-        }}
+        onCanPlay={markHealthy}
+        onSeeked={markHealthy}
         onError={() => {
           setBuffering(true);
           void recoverStream();
@@ -397,8 +433,8 @@ export function VideoPlayer({
           >
             <canvas
               ref={previewCanvasRef}
-              width={PREVIEW_W * 2}
-              height={PREVIEW_H * 2}
+              width={SB_FRAME_W}
+              height={SB_FRAME_H}
               className="rounded-md border border-white/25 bg-black shadow-card"
               style={{ width: PREVIEW_W, height: PREVIEW_H }}
             />
