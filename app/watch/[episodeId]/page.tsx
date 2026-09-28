@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { storyboardPublicUrl } from "@/lib/storyboard";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -387,6 +388,7 @@ export default function WatchPage() {
           synopsis={titleData?.synopsis}
           onOpenDetails={openDetails}
           onRequestFreshSrc={refreshVideoUrl}
+          storyboardUrl={episode.video_url ? storyboardPublicUrl(supabase, episode.video_url) : null}
           backButton={backButton}
           onTimeUpdate={reportProgress}
           onEnded={() => reportProgress(episode.duration_seconds ?? lastPlayheadRef.current ?? 0, true)}

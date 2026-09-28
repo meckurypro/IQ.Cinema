@@ -10,6 +10,12 @@ import { ArrowLeft, Upload, Check, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { uploadVideoResumable } from "@/lib/supabase/resumableUpload";
+import {
+  generateStoryboard,
+  uploadStoryboard,
+  storyboardPath,
+  STORYBOARD_BUCKET,
+} from "@/lib/storyboard";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
@@ -163,6 +169,8 @@ export default function UploadPage() {
   const [units, setUnits] = useState<EpisodeRow[]>([]);
   const [saving, setSaving] = useState<"draft" | "submit" | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [buildingPreview, setBuildingPreview] = useState(false);
+  const [backfill, setBackfill] = useState<{ id: string; pct: number; msg?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState<"draft" | "submit" | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -258,6 +266,32 @@ export default function UploadPage() {
     setStep("episode");
   }
 
+  // One-off backfill for episodes uploaded before storyboards existed.
+  // Reads the stored video from the creator's device (slow, network-bound),
+  // so it is explicit and shows progress rather than running for viewers.
+  async function rebuildPreview(d: EpisodeRow) {
+    if (!d.video_url) return;
+    setBackfill({ id: d.id, pct: 0 });
+    try {
+      const { data, error: urlErr } = await supabase.storage
+        .from("videos")
+        .createSignedUrl(d.video_url, 60 * 30);
+      if (urlErr || !data) throw urlErr ?? new Error("No URL");
+      const blob = await generateStoryboard(data.signedUrl, {
+        remote: true,
+        onProgress: (pct) => setBackfill({ id: d.id, pct }),
+      });
+      await uploadStoryboard(supabase, d.video_url, blob);
+      setBackfill({ id: d.id, pct: 1, msg: "Scrub preview ready." });
+    } catch {
+      setBackfill({
+        id: d.id,
+        pct: 0,
+        msg: "Couldn't build the preview from here. Re-uploading the video will build it.",
+      });
+    }
+  }
+
   async function handleSelectVideo(file: File | null) {
     setVideoFile(file);
     setVideoMeta(null);
@@ -328,6 +362,22 @@ export default function UploadPage() {
       }
       setUploadProgress(null);
       videoPath = path;
+
+      // Scrub-preview strip: built from the LOCAL file (instant seeks, no
+      // network reads) and stored as one small image, so viewers scrub
+      // against an image instead of the video. Best-effort — the episode
+      // still saves without it.
+      setBuildingPreview(true);
+      const localUrl = URL.createObjectURL(videoFile);
+      try {
+        const blob = await generateStoryboard(localUrl);
+        await uploadStoryboard(supabase, path, blob);
+      } catch {
+        /* non-fatal: player falls back to a plain scrub box */
+      } finally {
+        URL.revokeObjectURL(localUrl);
+        setBuildingPreview(false);
+      }
     }
 
     const payload = {
@@ -358,6 +408,7 @@ export default function UploadPage() {
     // creator just successfully made.
     if (isReplacingVideo && oldVideoPath && oldVideoPath !== videoPath) {
       supabase.storage.from("videos").remove([oldVideoPath]).catch(() => {});
+      supabase.storage.from(STORYBOARD_BUCKET).remove([storyboardPath(oldVideoPath)]).catch(() => {});
     }
 
     setEpisodeRowId(row.id);
@@ -388,6 +439,7 @@ export default function UploadPage() {
     }
     if (target?.video_url) {
       supabase.storage.from("videos").remove([target.video_url]).catch(() => {});
+      supabase.storage.from(STORYBOARD_BUCKET).remove([storyboardPath(target.video_url)]).catch(() => {});
     }
     setUnits((prev) => prev.filter((u) => u.id !== id));
     setConfirmDeleteId(null);
@@ -551,7 +603,24 @@ export default function UploadPage() {
                     </span>
                   </button>
                   {episodeRowId === d.id && (
-                    <div className="mt-2 border-t border-border pt-2">
+                    <div className="mt-2 space-y-2 border-t border-border pt-2">
+                      {d.video_url && (
+                        <div>
+                          <button
+                            type="button"
+                            disabled={backfill?.id === d.id && !backfill.msg}
+                            onClick={() => rebuildPreview(d)}
+                            className="text-[12px] font-medium text-pink transition-colors duration-150 hover:text-pink/75 disabled:opacity-50"
+                          >
+                            {backfill?.id === d.id && !backfill.msg
+                              ? `Building scrub preview… ${Math.round(backfill.pct * 100)}%`
+                              : "Build scrub preview"}
+                          </button>
+                          {backfill?.id === d.id && backfill.msg && (
+                            <p className="mt-1 text-[11px] text-muted">{backfill.msg}</p>
+                          )}
+                        </div>
+                      )}
                       {confirmDeleteId === d.id ? (
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[12px] text-crimson">
@@ -635,6 +704,9 @@ export default function UploadPage() {
               </p>
             )}
             {videoError && <p className="text-[13px] text-crimson">{videoError}</p>}
+            {buildingPreview && (
+              <p className="text-[12px] text-muted">Building scrub preview…</p>
+            )}
             {uploadProgress !== null && (
               <div className="space-y-1">
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
