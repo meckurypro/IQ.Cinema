@@ -2,7 +2,8 @@
 
 "use client";
 
-import { Bookmark, MessageCircle, Layers, Forward } from "lucide-react";
+import { Bookmark, MessageCircle, Layers } from "lucide-react";
+import { ShareIcon } from "@/components/watch/ShareIcon";
 import clsx from "clsx";
 import { formatCount } from "@/lib/format";
 
@@ -85,7 +86,7 @@ export function ActionRail({
         onClick={onOpenComments}
       />
       <RailButton
-        icon={<Forward size={31} className="text-white" />}
+        icon={<ShareIcon size={30} className="text-white" />}
         count={shareCount}
         label="Share"
         showLabel
