@@ -1,11 +1,10 @@
 // app/title/[id]/page.tsx
 
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { TitleActions } from "@/components/title/TitleActions";
+import { formatEpisodeCount } from "@/lib/format";
 
 async function getTitle(slug: string) {
   const supabase = createClient();
@@ -13,7 +12,7 @@ async function getTitle(slug: string) {
   const { data: title } = await supabase
     .from("titles")
     .select(
-      "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, status, total_unique_views, free_episode_count, creator_id, profiles!titles_creator_id_fkey(display_name, username)"
+      "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, status, total_unique_views, free_episode_count"
     )
     .eq("slug", slug)
     .single();
@@ -22,7 +21,7 @@ async function getTitle(slug: string) {
 
   const { data: episodes } = await supabase
     .from("episodes")
-    .select("id, episode_number, name, duration_seconds, unlock_cost_coins, status")
+    .select("id, episode_number, name, unlock_cost_coins")
     .eq("title_id", title.id)
     .eq("status", "published")
     .order("episode_number", { ascending: true });
@@ -41,7 +40,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
 
   const { title, episodes, settings } = data;
   const freeCount = title.free_episode_count ?? settings?.default_free_episodes ?? 4;
-  const creator = Array.isArray(title.profiles) ? title.profiles[0] : title.profiles;
+  const defaultCost = settings?.default_episode_unlock_coins ?? 30;
 
   return (
     <div className="fade-in">
@@ -58,14 +57,17 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-black/30" />
       </div>
 
-      <div className="-mt-8 rounded-t-xl bg-bg px-4 pb-4 pt-5">
+      {/* Sits below the poster, not over it. A negative top margin used to pull
+          this block up under the poster's absolutely-positioned layers, which
+          paint above non-positioned siblings — that covered the top of the
+          title. The poster's own gradient already fades into the page. */}
+      <div className="px-4 pb-8 pt-6">
         <h1 className="font-display text-[22px] font-semibold leading-tight text-text">
           {title.title}
         </h1>
         <p className="mt-1 text-[13px] text-muted">
           {title.content_rating} ·{" "}
-          {title.status === "coming_soon" ? "Coming soon" : `${episodes.length} episodes`}
-          {creator?.display_name ? ` · by ${creator.display_name}` : ""}
+          {title.status === "coming_soon" ? "Coming soon" : formatEpisodeCount(episodes.length)}
         </p>
 
         {title.synopsis && (
@@ -76,60 +78,11 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
           titleId={title.id}
           slug={title.slug}
           status={title.status}
-          firstEpisodeId={episodes[0]?.id ?? null}
+          episodes={episodes}
+          freeCount={freeCount}
+          defaultCost={defaultCost}
         />
       </div>
-
-      {title.status !== "coming_soon" && (
-      <div className="px-4">
-        <h2 className="font-display mb-2 text-[17px] font-semibold text-text">Episodes</h2>
-        <ul className="divide-y divide-border rounded-md border border-border bg-surface">
-          {episodes.map((ep) => {
-            const isFree = ep.episode_number <= freeCount;
-            const cost = ep.unlock_cost_coins ?? settings?.default_episode_unlock_coins ?? 30;
-
-            return (
-              <li key={ep.id}>
-                <Link
-                  href={`/watch/${ep.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-medium text-text">
-                      EP {ep.episode_number}
-                      {ep.name ? ` · ${ep.name}` : ""}
-                    </p>
-                    {ep.duration_seconds && (
-                      <p className="text-[12px] text-muted">
-                        {Math.round(ep.duration_seconds / 60)} min
-                      </p>
-                    )}
-                  </div>
-
-                  {isFree ? (
-                    <span className="shrink-0 rounded-full bg-surface-raised px-2.5 py-1 text-[11px] font-medium text-muted">
-                      Free
-                    </span>
-                  ) : (
-                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-gold-soft px-2.5 py-1 text-[11px] font-semibold text-gold">
-                      <Lock size={11} />
-                      <Zap size={11} className="fill-gold" />
-                      {cost}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-
-          {!episodes.length && (
-            <li className="px-4 py-6 text-center text-sm text-muted">
-              No episodes published yet.
-            </li>
-          )}
-        </ul>
-      </div>
-      )}
     </div>
   );
 }

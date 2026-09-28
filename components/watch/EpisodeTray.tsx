@@ -26,7 +26,8 @@ export function EpisodeTray({
   open: boolean;
   onClose: () => void;
   episodes: TrayEpisode[];
-  currentEpisodeId: string;
+  // Absent when opened from the title page, where nothing is playing yet.
+  currentEpisodeId?: string;
   freeCount: number;
   unlockedIds: Set<string>;
   defaultCost: number;
