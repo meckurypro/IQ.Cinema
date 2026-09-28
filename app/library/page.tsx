@@ -39,11 +39,18 @@ export default function LibraryPage() {
     if (!user) return;
     // These two don't depend on each other — fire them together instead
     // of waiting on one round trip before starting the next.
-    const [{ data: wl }, { data: hist }] = await Promise.all([
+    const [{ data: wl }, { data: saves }, { data: hist }] = await Promise.all([
+      // Legacy title-level saves, from before saving moved to episodes.
       supabase
         .from("watchlist")
         .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
         .eq("user_id", user.id),
+      // Current behavior: saves are per episode; My List shows their titles.
+      supabase
+        .from("episode_saves")
+        .select("created_at, episodes(titles(id, slug, title, poster_url, total_unique_views, is_exclusive))")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
       supabase
         .from("watch_history")
         .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
@@ -51,7 +58,19 @@ export default function LibraryPage() {
         .order("updated_at", { ascending: false })
         .limit(20),
     ]);
-    setWatchlist((wl ?? []).map((r: any) => r.titles).filter(Boolean));
+    // Newest episode saves first, then legacy ones, one card per title.
+    const seen = new Set<string>();
+    const merged: TitleCardData[] = [];
+    for (const t of [
+      ...(saves ?? []).map((r: any) => r.episodes?.titles),
+      ...(wl ?? []).map((r: any) => r.titles),
+    ]) {
+      if (t && !seen.has(t.id)) {
+        seen.add(t.id);
+        merged.push(t);
+      }
+    }
+    setWatchlist(merged);
     setHistory((hist ?? []).map((r: any) => r.titles).filter(Boolean));
   }, [user, supabase]);
 

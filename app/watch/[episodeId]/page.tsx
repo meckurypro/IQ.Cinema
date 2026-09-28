@@ -27,6 +27,7 @@ type EpisodeData = {
   unlock_cost_coins: number | null;
   comment_count: number;
   share_count: number;
+  save_count: number;
 };
 
 type TitleData = {
@@ -36,7 +37,6 @@ type TitleData = {
   poster_url: string | null;
   total_unique_views: number;
   free_episode_count: number | null;
-  save_count: number;
 };
 
 function getDeviceId() {
@@ -63,9 +63,13 @@ export default function WatchPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastReportedRef = useRef(0);
+  // Real viewing time for the view-count rule, tracked separately from the
+  // playhead: dragging the bar to 75% must not count as having watched 75%.
+  const watchedRef = useRef(0); // seconds actually played this session
+  const lastPlayheadRef = useRef<number | null>(null);
+  const lastReportedRef = useRef(0); // watchedRef value at the last report
 
-  // Engagement: save (title-level, mirrors My List), comments, share.
+  // Engagement: save (episode-level), comments, share.
   const [saved, setSaved] = useState(false);
   const [saveCount, setSaveCount] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
@@ -88,11 +92,17 @@ export default function WatchPage() {
     episode != null && freeCount != null && episode.episode_number <= freeCount;
 
   useEffect(() => {
+    watchedRef.current = 0;
+    lastPlayheadRef.current = null;
+    lastReportedRef.current = 0;
+  }, [episodeId]);
+
+  useEffect(() => {
     async function load() {
       const { data: ep } = await supabase
         .from("episodes")
         .select(
-          "id, episode_number, name, title_id, video_url, duration_seconds, unlock_cost_coins, comment_count, share_count"
+          "id, episode_number, name, title_id, video_url, duration_seconds, unlock_cost_coins, comment_count, share_count, save_count"
         )
         .eq("id", episodeId)
         .single();
@@ -100,13 +110,14 @@ export default function WatchPage() {
       if (ep) {
         setCommentCount(ep.comment_count ?? 0);
         setShareCount(ep.share_count ?? 0);
+        setSaveCount(ep.save_count ?? 0);
       }
 
       if (ep) {
         const [{ data: t }, { data: settings }] = await Promise.all([
           supabase
             .from("titles")
-            .select("title, synopsis, content_rating, poster_url, total_unique_views, free_episode_count, save_count")
+            .select("title, synopsis, content_rating, poster_url, total_unique_views, free_episode_count")
             .eq("id", ep.title_id)
             .single(),
           supabase
@@ -117,7 +128,6 @@ export default function WatchPage() {
         setTitleData((t as TitleData) ?? null);
         setFreeCount(t?.free_episode_count ?? settings?.default_free_episodes ?? 4);
         setDefaultUnlockCost(settings?.default_episode_unlock_coins ?? 30);
-        setSaveCount(t?.save_count ?? 0);
       }
 
       if (user && ep) {
@@ -129,10 +139,10 @@ export default function WatchPage() {
             .eq("episode_id", episodeId)
             .maybeSingle(),
           supabase
-            .from("watchlist")
+            .from("episode_saves")
             .select("user_id")
             .eq("user_id", user.id)
-            .eq("title_id", ep.title_id)
+            .eq("episode_id", ep.id)
             .maybeSingle(),
         ]);
         setUnlocked(!!unlock);
@@ -236,21 +246,36 @@ export default function WatchPage() {
     setUnlocked(true);
   }
 
-  function reportProgress(seconds: number) {
+  // Called with the playhead position on every timeupdate. Only forward
+  // movement of about a normal playback tick counts as watching — a seek
+  // (either direction) produces a big jump and is ignored.
+  function reportProgress(playhead: number, force = false) {
     if (!episode) return;
-    if (Math.abs(seconds - lastReportedRef.current) < 10) return; // throttle
-    lastReportedRef.current = seconds;
-    supabase.rpc("record_play", {
-      p_user_id: user?.id ?? null,
-      p_device_id: getDeviceId(),
-      p_episode_id: episode.id,
-      p_watched_seconds: Math.floor(seconds),
-    });
+    const prev = lastPlayheadRef.current;
+    lastPlayheadRef.current = playhead;
+    if (prev !== null) {
+      const delta = playhead - prev;
+      if (delta > 0 && delta <= 1.5) watchedRef.current += delta;
+    }
+
+    if (!force && watchedRef.current - lastReportedRef.current < 10) return; // throttle
+    if (force && watchedRef.current === lastReportedRef.current) return;
+    lastReportedRef.current = watchedRef.current;
+    supabase
+      .rpc("record_play", {
+        p_user_id: user?.id ?? null,
+        p_device_id: getDeviceId(),
+        p_episode_id: episode.id,
+        p_watched_seconds: Math.floor(watchedRef.current),
+      })
+      .then(({ error: playErr }) => {
+        if (playErr) console.error("record_play failed", playErr.message);
+      });
 
     // Keep the Library "History" tab in sync with actual playback progress.
     if (user) {
       const completed = episode.duration_seconds
-        ? seconds >= episode.duration_seconds * 0.9
+        ? playhead >= episode.duration_seconds * 0.9
         : false;
       supabase
         .from("watch_history")
@@ -259,7 +284,7 @@ export default function WatchPage() {
             user_id: user.id,
             episode_id: episode.id,
             title_id: episode.title_id,
-            progress_seconds: Math.floor(seconds),
+            progress_seconds: Math.floor(playhead),
             completed,
             updated_at: new Date().toISOString(),
           },
@@ -279,12 +304,12 @@ export default function WatchPage() {
     setSaveCount((c) => Math.max(0, c + (next ? 1 : -1)));
 
     const { error: err } = next
-      ? await supabase.from("watchlist").insert({ user_id: user.id, title_id: episode.title_id })
+      ? await supabase.from("episode_saves").insert({ user_id: user.id, episode_id: episode.id })
       : await supabase
-          .from("watchlist")
+          .from("episode_saves")
           .delete()
           .eq("user_id", user.id)
-          .eq("title_id", episode.title_id);
+          .eq("episode_id", episode.id);
 
     if (err) {
       setSaved(!next);
@@ -353,7 +378,7 @@ export default function WatchPage() {
           onOpenDetails={openDetails}
           backButton={backButton}
           onTimeUpdate={reportProgress}
-          onEnded={() => episode.duration_seconds && reportProgress(episode.duration_seconds)}
+          onEnded={() => reportProgress(episode.duration_seconds ?? lastPlayheadRef.current ?? 0, true)}
           actionRail={
             <ActionRail
               saved={saved}
