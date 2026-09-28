@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { Pause, Play, RotateCw } from "lucide-react";
 import clsx from "clsx";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import { useBlobUrl } from "@/hooks/useOfflineDownloads";
 import type { OfflineEpisode } from "@/lib/offline/db";
 import { SelectDot } from "@/components/library/SelectDot";
@@ -19,13 +19,11 @@ function statusLine(ep: OfflineEpisode) {
   const pct = ep.totalBytes > 0 ? `${Math.floor(fraction(ep) * 100)}%` : null;
   switch (ep.status) {
     case "complete":
-      return [formatBytes(ep.totalBytes), formatDuration(ep.durationSeconds)].filter(Boolean).join(" · ");
+      return formatDuration(ep.durationSeconds) || "Ready to watch";
     case "queued":
       return "Waiting to download…";
     case "downloading":
-      return pct
-        ? `Downloading ${pct} · ${formatBytes(ep.receivedBytes)} of ${formatBytes(ep.totalBytes)}`
-        : "Downloading…";
+      return pct ? `Downloading ${pct}` : "Downloading…";
     case "paused":
       return ep.error === "offline" ? "Waiting for connection" : `Paused${pct ? ` · ${pct}` : ""}`;
     case "error":

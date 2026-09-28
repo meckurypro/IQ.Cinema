@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { Download, Folder } from "lucide-react";
 import clsx from "clsx";
-import { formatBytes, formatEpisodeCount } from "@/lib/format";
+import { formatEpisodeCount } from "@/lib/format";
 import { useBlobUrl, type DownloadFolder } from "@/hooks/useOfflineDownloads";
 import { SelectDot } from "@/components/library/SelectDot";
 
@@ -61,9 +61,7 @@ export function FolderCard({
       </div>
 
       <p className="mt-2 truncate text-[14px] font-semibold text-text">{name}</p>
-      <p className="mt-0.5 truncate text-[12.5px] text-muted">
-        {formatEpisodeCount(count)} · {formatBytes(folder.bytes)}
-      </p>
+      <p className="mt-0.5 truncate text-[12.5px] text-muted">{formatEpisodeCount(count)}</p>
     </>
   );
 
