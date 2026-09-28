@@ -25,6 +25,9 @@ export function VideoPlayer({
   autoPlay,
   speed = 1,
   posterUrl,
+  title,
+  synopsis,
+  onOpenDetails,
   actionRail,
   topBar,
   onTimeUpdate,
@@ -38,6 +41,11 @@ export function VideoPlayer({
   // controls this from the parent so it survives across re-renders.
   speed?: number;
   posterUrl?: string;
+  // Title (without the episode prefix — EP.N lives in the top bar) and a short
+  // synopsis, shown in the bottom overlay together with the rest of the controls.
+  title?: string;
+  synopsis?: string | null;
+  onOpenDetails?: () => void;
   actionRail?: React.ReactNode;
   topBar?: React.ReactNode;
   onTimeUpdate?: (seconds: number) => void;
@@ -412,16 +420,16 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* App-icon watermark, bottom-right. Deliberately NOT tied to
+      {/* App-icon watermark, bottom-left. Deliberately NOT tied to
           showControls — it stays visible whether or not the control layer
-          is faded, sitting in the gap between the seek bar and the action
-          rail so it never collides with either. */}
+          is faded. It sits in the gap between the seek bar and the
+          title/synopsis block so it never collides with either. */}
       <img
         src="/watermark.png"
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute right-3.5 z-10 h-8 w-8 select-none rounded-md opacity-55"
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)" }}
+        className="pointer-events-none absolute left-3.5 z-10 h-8 w-8 select-none rounded-md opacity-55"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 52px)" }}
       />
 
       {/* Action rail (save/comments/share/episodes) — fades with the rest
@@ -464,6 +472,28 @@ export function VideoPlayer({
               {formatTime(scrubTime)} / {formatTime(duration)}
             </span>
           </div>
+        )}
+
+        {(title || synopsis) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails?.();
+            }}
+            className="pointer-events-auto mb-11 max-w-[72%] text-left"
+          >
+            {title && (
+              <p className="text-[16px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
+                {title}
+              </p>
+            )}
+            {synopsis && (
+              <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
+                {synopsis}
+              </p>
+            )}
+          </button>
         )}
 
         <div className="flex items-center gap-2.5">
