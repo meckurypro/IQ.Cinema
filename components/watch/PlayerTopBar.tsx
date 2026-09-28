@@ -17,7 +17,7 @@ export function PlayerTopBar({
   episodeNumber: number;
   onBack: () => void;
   // Tapping the EP badge doubles as the old "open details" affordance —
-  // there's no room for a title/synopsis strip in this layout anymore.
+  // title/synopsis now live in the player's bottom overlay.
   onOpenTitle?: () => void;
   speed: number;
   onOpenSpeed: () => void;

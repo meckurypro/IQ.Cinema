@@ -84,7 +84,6 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const savingRef = useRef<Set<string>>(new Set());
-  const likingRef = useRef<Set<string>>(new Set());
   const watchedRef = useRef(0);
   const lastPlayheadRef = useRef<number | null>(null);
   const lastReportedRef = useRef(0);
@@ -398,45 +397,6 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
     }
   }
 
-  async function toggleLike(episode: FeedEpisode) {
-    if (!user) return router.push("/auth/login");
-    if (likingRef.current.has(episode.id)) return;
-    likingRef.current.add(episode.id);
-    const current = engagement[episode.id];
-    const next = !current?.liked;
-    setEngagement((prev) => ({
-      ...prev,
-      [episode.id]: {
-        ...prev[episode.id],
-        liked: next,
-        likeCount: Math.max(0, (prev[episode.id]?.likeCount ?? 0) + (next ? 1 : -1)),
-      },
-    }));
-    let failed = false;
-    try {
-      const { error: err } = next
-        ? await supabase
-            .from("episode_likes")
-            .upsert({ user_id: user.id, episode_id: episode.id }, { onConflict: "user_id,episode_id", ignoreDuplicates: true })
-        : await supabase.from("episode_likes").delete().eq("user_id", user.id).eq("episode_id", episode.id);
-      failed = !!err;
-    } catch {
-      failed = true;
-    } finally {
-      likingRef.current.delete(episode.id);
-    }
-    if (failed) {
-      setEngagement((prev) => ({
-        ...prev,
-        [episode.id]: {
-          ...prev[episode.id],
-          liked: !next,
-          likeCount: Math.max(0, (prev[episode.id]?.likeCount ?? 0) + (next ? -1 : 1)),
-        },
-      }));
-    }
-  }
-
   async function handleShare(episode: FeedEpisode) {
     const url = typeof window !== "undefined" ? `${window.location.origin}/watch/${episode.id}` : "";
     const { data } = await supabase.rpc("record_episode_share", { p_episode_id: episode.id });
@@ -521,6 +481,9 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
                     autoPlay
                     speed={speed}
                     posterUrl={ep.thumbnail_url ?? titleData?.poster_url ?? undefined}
+                    title={titleData?.title}
+                    synopsis={titleData?.synopsis}
+                    onOpenDetails={openDetails}
                     onRequestFreshSrc={() => refreshVideoUrl(ep.id)}
                     storyboardUrl={ep.video_url ? storyboardPublicUrl(supabase, ep.video_url) : null}
                     onTimeUpdate={(t) => reportProgress(ep, t)}
@@ -543,9 +506,6 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
                         saved={eng?.saved ?? false}
                         saveCount={eng?.saveCount ?? ep.save_count}
                         onToggleSave={() => toggleSave(ep)}
-                        liked={eng?.liked ?? false}
-                        likeCount={eng?.likeCount ?? ep.like_count}
-                        onToggleLike={() => toggleLike(ep)}
                         commentCount={eng?.commentCount ?? ep.comment_count}
                         onOpenComments={() => setShowComments(true)}
                         shareCount={eng?.shareCount ?? ep.share_count}
