@@ -9,6 +9,10 @@ import { AuthProvider } from "@/hooks/useAuth";
 export const metadata: Metadata = {
   title: "IQ Cinema",
   description: "Watch and support independent film and series creators.",
+  icons: {
+    icon: "/IQCinemaIcon.png",
+    apple: "/IQCinemaIcon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
