@@ -9,7 +9,7 @@ import { Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
 import { getDeviceId } from "@/lib/device";
-import { downloadEpisodeVideo } from "@/lib/download";
+import { useOfflineDownloads } from "@/hooks/useOfflineDownloads";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
@@ -64,6 +64,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
   const router = useRouter();
   const { user } = useAuth();
   const supabase = createClient();
+  const offline = useOfflineDownloads();
 
   const [episodes, setEpisodes] = useState<FeedEpisode[] | null>(null);
   const [titleData, setTitleData] = useState<TitleData | null>(null);
@@ -470,11 +471,29 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
     if (data) setTitleData((t) => (t ? { ...t, ...data } : t));
   }
 
+  // Saves the active episode into the in-app Downloads store (IndexedDB) for
+  // offline viewing — it never triggers a browser file download.
   async function handleDownload() {
-    const active = episodes?.find((e) => e.id === activeId);
-    if (!active?.video_url) throw new Error("No video");
-    const fileName = `${(titleData?.title ?? "iq-cinema").replace(/[^a-z0-9]+/gi, "-")}-ep${active.episode_number}.mp4`;
-    await downloadEpisodeVideo(supabase, active.video_url, fileName);
+    const ep = episodes?.find((e) => e.id === activeId);
+    if (!ep?.video_url || !titleData) throw new Error("No video");
+    await offline.download(
+      {
+        episodeId: ep.id,
+        titleId: ep.title_id,
+        episodeNumber: ep.episode_number,
+        name: ep.name,
+        durationSeconds: ep.duration_seconds,
+        videoPath: ep.video_url,
+      },
+      {
+        titleId: ep.title_id,
+        slug: titleData.slug,
+        title: titleData.title,
+        synopsis: titleData.synopsis,
+        contentRating: titleData.content_rating,
+        posterUrl: titleData.poster_url,
+      }
+    );
   }
 
   if (!episodes) {
@@ -629,7 +648,21 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
         open={showMore}
         onClose={() => setShowMore(false)}
         videoHeight={active?.video_height ?? null}
+        downloadState={offline.episodeState(active.id)}
+        downloadDisabledReason={
+          !user
+            ? "Sign in to download"
+            : !active.video_url
+              ? "Not available to download"
+              : !isUnlocked(active)
+                ? "Unlock this episode to download"
+                : null
+        }
         onDownload={handleDownload}
+        onPauseDownload={() => offline.pause(active.id)}
+        onResumeDownload={() => offline.resume(active.id)}
+        onRemoveDownload={() => offline.removeEpisodes([active.id])}
+        downloadsHref={`/downloads?title=${active.title_id}`}
       />
 
       <CommentsSheet

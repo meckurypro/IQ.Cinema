@@ -1,0 +1,15 @@
+{
+  "name": "IQ Cinema",
+  "short_name": "IQ Cinema",
+  "description": "Watch and support independent film and series creators.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "icons": [
+    { "src": "/IQCinemaIcon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" },
+    { "src": "/IQCinemaIcon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "maskable" }
+  ]
+}

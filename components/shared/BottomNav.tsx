@@ -23,7 +23,7 @@ const items = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const hideOn = ["/watch/", "/auth/"];
+  const hideOn = ["/watch/", "/auth/", "/downloads/play"];
   if (hideOn.some((p) => pathname.startsWith(p))) return null;
 
   const activeIndex = items.findIndex(({ href }) =>
