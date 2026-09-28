@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Lock, Play, Bookmark, Zap } from "lucide-react";
+import { Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/Button";
+import { TitleActions } from "@/components/title/TitleActions";
 
 async function getTitle(slug: string) {
   const supabase = createClient();
@@ -13,7 +13,7 @@ async function getTitle(slug: string) {
   const { data: title } = await supabase
     .from("titles")
     .select(
-      "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, total_unique_views, free_episode_count, creator_id, profiles!titles_creator_id_fkey(display_name, username)"
+      "id, slug, title, synopsis, poster_url, banner_url, content_type, content_rating, status, total_unique_views, free_episode_count, creator_id, profiles!titles_creator_id_fkey(display_name, username)"
     )
     .eq("slug", slug)
     .single();
@@ -63,7 +63,8 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
           {title.title}
         </h1>
         <p className="mt-1 text-[13px] text-muted">
-          {title.content_rating} · {episodes.length} episodes
+          {title.content_rating} ·{" "}
+          {title.status === "coming_soon" ? "Coming soon" : `${episodes.length} episodes`}
           {creator?.display_name ? ` · by ${creator.display_name}` : ""}
         </p>
 
@@ -71,20 +72,15 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
           <p className="mt-3 text-[14px] leading-relaxed text-text/85">{title.synopsis}</p>
         )}
 
-        <div className="mt-4 flex gap-2">
-          <Link
-            href={episodes[0] ? `/watch/${episodes[0].id}` : "#"}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
-          >
-            <Play size={16} className="fill-white" />
-            Watch now
-          </Link>
-          <Button variant="secondary" size="icon" aria-label="Add to library">
-            <Bookmark size={17} />
-          </Button>
-        </div>
+        <TitleActions
+          titleId={title.id}
+          slug={title.slug}
+          status={title.status}
+          firstEpisodeId={episodes[0]?.id ?? null}
+        />
       </div>
 
+      {title.status !== "coming_soon" && (
       <div className="px-4">
         <h2 className="font-display mb-2 text-[17px] font-semibold text-text">Episodes</h2>
         <ul className="divide-y divide-border rounded-md border border-border bg-surface">
@@ -133,6 +129,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
           )}
         </ul>
       </div>
+      )}
     </div>
   );
 }

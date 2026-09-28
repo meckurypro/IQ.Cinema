@@ -4,6 +4,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -40,6 +41,7 @@ type TitleRow = {
   slug: string;
   synopsis: string | null;
   genre: string | null;
+  category: string | null;
   content_rating: ContentRating | null;
   poster_url: string | null;
   content_type: string;
@@ -83,6 +85,7 @@ export default function ManageTitlePage() {
   const [editTitle, setEditTitle] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editGenre, setEditGenre] = useState("");
+  const [editCategory, setEditCategory] = useState<Category>(DEFAULT_CATEGORY);
   const [editContentRating, setEditContentRating] = useState<ContentRating>("13+");
   const [editPosterFile, setEditPosterFile] = useState<File | null>(null);
   const [savingDetails, setSavingDetails] = useState(false);
@@ -92,7 +95,7 @@ export default function ManageTitlePage() {
       supabase
         .from("titles")
         .select(
-          "id, title, slug, synopsis, genre, content_rating, poster_url, content_type, status, creator_id, admin_review_note, reviewed_at, review_ignored_at, total_unique_views"
+          "id, title, slug, synopsis, genre, category, content_rating, poster_url, content_type, status, creator_id, admin_review_note, reviewed_at, review_ignored_at, total_unique_views"
         )
         .eq("id", id)
         .single(),
@@ -108,6 +111,7 @@ export default function ManageTitlePage() {
       setEditTitle(t.title);
       setEditSynopsis(t.synopsis ?? "");
       setEditGenre(t.genre ?? "");
+      setEditCategory((t.category as Category) ?? DEFAULT_CATEGORY);
       setEditContentRating((t.content_rating as ContentRating) ?? "13+");
     }
     setLoading(false);
@@ -148,6 +152,7 @@ export default function ManageTitlePage() {
         title: editTitle,
         synopsis: editSynopsis || null,
         genre: editGenre || null,
+        category: editCategory,
         content_rating: editContentRating,
         poster_url: posterUrl,
       })
@@ -286,6 +291,18 @@ export default function ManageTitlePage() {
             placeholder="Title"
             className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
           />
+          <select
+            value={editCategory}
+            onChange={(e) => setEditCategory(e.target.value as Category)}
+            aria-label="Category"
+            className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
           <select
             value={editGenre}
             onChange={(e) => setEditGenre(e.target.value)}

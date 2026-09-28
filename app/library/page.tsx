@@ -4,157 +4,266 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { TitleCard, type TitleCardData } from "@/components/title/TitleCard";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { useMyList } from "@/hooks/useMyList";
+import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
+import { groupByDay, type ListKind } from "@/lib/myList";
 import { PullToRefresh } from "@/components/shared/PullToRefresh";
-import clsx from "clsx";
+import { BottomSheet } from "@/components/shared/BottomSheet";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/Button";
+import { LibraryTabs, type TopTab } from "@/components/library/LibraryTabs";
+import { SegmentedControl } from "@/components/library/SegmentedControl";
+import { SubscribeBanner } from "@/components/library/SubscribeBanner";
+import { PosterCard } from "@/components/library/PosterCard";
+import { HistoryRow } from "@/components/library/HistoryRow";
+import { EmptyState } from "@/components/library/EmptyState";
+import { EditBar } from "@/components/library/EditBar";
 
-type Tab = "list" | "history";
+type ReminderTab = "released" | "upcoming";
+
+const REMINDER_OPTIONS = [
+  { value: "released", label: "Released" },
+  { value: "upcoming", label: "Upcoming" },
+] as const;
+
+const supabase = createClient();
 
 export default function LibraryPage() {
   const { user, loading: authLoading } = useAuth();
-  const supabase = createClient();
-  const [tab, setTab] = useState<Tab>("list");
-  const [watchlist, setWatchlist] = useState<TitleCardData[]>([]);
-  const [history, setHistory] = useState<TitleCardData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ list: null, history: null });
-  const tabBarRef = useRef<HTMLDivElement>(null);
-  const [underline, setUnderline] = useState({ left: 0, width: 0 });
 
-  // Measure the actual rendered button rather than guessing pixel widths for
-  // "My List" vs "History" — robust to font metrics, locale, or copy changes.
-  useLayoutEffect(() => {
-    const btn = tabRefs.current[tab];
-    const bar = tabBarRef.current;
-    if (!btn || !bar) return;
-    setUnderline({ left: btn.offsetLeft, width: btn.offsetWidth });
-  }, [tab]);
+  const [top, setTop] = useState<TopTab>("following");
+  const [category, setCategory] = useState<Category>(DEFAULT_CATEGORY);
+  const [reminderTab, setReminderTab] = useState<ReminderTab>("released");
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    // These two don't depend on each other — fire them together instead
-    // of waiting on one round trip before starting the next.
-    const [{ data: wl }, { data: saves }, { data: hist }] = await Promise.all([
-      // Legacy title-level saves, from before saving moved to episodes.
-      supabase
-        .from("watchlist")
-        .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
-        .eq("user_id", user.id),
-      // Current behavior: saves are per episode; My List shows their titles.
-      supabase
-        .from("episode_saves")
-        .select("created_at, episodes(titles(id, slug, title, poster_url, total_unique_views, is_exclusive))")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("watch_history")
-        .select("titles(id, slug, title, poster_url, total_unique_views, is_exclusive)")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(20),
-    ]);
-    // Newest episode saves first, then legacy ones, one card per title.
-    const seen = new Set<string>();
-    const merged: TitleCardData[] = [];
-    for (const t of [
-      ...(saves ?? []).map((r: any) => r.episodes?.titles),
-      ...(wl ?? []).map((r: any) => r.titles),
-    ]) {
-      if (t && !seen.has(t.id)) {
-        seen.add(t.id);
-        merged.push(t);
-      }
-    }
-    setWatchlist(merged);
-    setHistory((hist ?? []).map((r: any) => r.titles).filter(Boolean));
-  }, [user, supabase]);
+  const kind: ListKind =
+    top === "reminders"
+      ? reminderTab === "released"
+        ? "reminders_released"
+        : "reminders_upcoming"
+      : top;
 
+  const { items, error, refresh, mutate } = useMyList(
+    user?.id,
+    kind,
+    top === "reminders" ? null : category
+  );
+
+  // Changing view always leaves edit mode; a selection only makes sense
+  // against the list it was made on.
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    setEditing(false);
+    setSelected(new Set());
+  }, [kind, category]);
 
-    let ignore = false;
-    load().then(() => {
-      // If the user changed (or we unmounted) while this was in flight,
-      // drop the result instead of overwriting newer state with stale data.
-      if (!ignore) setLoading(false);
+  const groups = useMemo(() => (top === "history" && items ? groupByDay(items) : []), [top, items]);
+  const total = items?.length ?? 0;
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+  }
 
-    return () => {
-      ignore = true;
-    };
-  }, [user, load]);
+  function toggleAll() {
+    if (!items) return;
+    setSelected((prev) =>
+      prev.size === items.length ? new Set() : new Set(items.map((i) => i.title_id))
+    );
+  }
 
-  const items = tab === "list" ? watchlist : history;
+  function toggleEdit() {
+    setEditing((v) => !v);
+    setSelected(new Set());
+  }
+
+  async function removeSelected() {
+    const ids = Array.from(selected);
+    setConfirmOpen(false);
+    if (!ids.length) return;
+
+    const run =
+      top === "following"
+        ? () => supabase.rpc("set_titles_follow", { p_title_ids: ids, p_follow: false })
+        : top === "history"
+          ? () => supabase.rpc("remove_from_history", { p_title_ids: ids })
+          : () => supabase.rpc("set_title_reminders", { p_title_ids: ids, p_on: false });
+
+    const ok = await mutate((rows) => rows.filter((r) => !ids.includes(r.title_id)), run);
+    if (ok) {
+      setSelected(new Set());
+      setEditing(false);
+    }
+  }
+
+  function toggleFollow(titleId: string, next: boolean) {
+    return mutate(
+      (rows) => rows.map((r) => (r.title_id === titleId ? { ...r, is_following: next } : r)),
+      () => supabase.rpc("set_titles_follow", { p_title_ids: [titleId], p_follow: next })
+    );
+  }
+
+  const actionLabel = top === "following" ? "Unfollow" : top === "history" ? "Delete" : "Remove";
+  const confirmCopy =
+    top === "following"
+      ? { title: "Unfollow", body: "They'll leave Following and your saved episodes for them will be cleared." }
+      : top === "history"
+        ? { title: "Delete from history", body: "Your watch progress for them will be cleared." }
+        : { title: "Remove reminders", body: "You won't be notified when they release." };
+
+  const showSkeleton = (authLoading || (user && items === null)) && !error;
 
   return (
-    <PullToRefresh onRefresh={load}>
+    <PullToRefresh onRefresh={refresh}>
       <div className="fade-in px-4 pt-5">
-        <h1 className="font-display text-2xl font-semibold text-text">Library</h1>
+        <LibraryTabs
+          value={top}
+          onChange={setTop}
+          editing={editing}
+          editDisabled={!total}
+          onToggleEdit={toggleEdit}
+        />
 
-        <div ref={tabBarRef} className="relative mt-4 flex gap-5 border-b border-border">
-          {(["list", "history"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              ref={(el) => {
-                tabRefs.current[t] = el;
-              }}
-              onClick={() => setTab(t)}
-              className={clsx(
-                "pb-2.5 text-[14px] font-medium transition-colors",
-                tab === t ? "text-pink" : "text-muted"
-              )}
-            >
-              {t === "list" ? "My List" : "History"}
-            </button>
-          ))}
-          {/* Sliding underline instead of an instant color/border swap on tap. */}
-          <div
-            className="absolute bottom-0 h-0.5 bg-pink transition-all duration-300 ease-out"
-            style={{ left: underline.left, width: underline.width }}
-          />
+        <div className="mt-1">
+          {top === "reminders" ? (
+            <SegmentedControl
+              ariaLabel="Reminder status"
+              options={REMINDER_OPTIONS}
+              value={reminderTab}
+              onChange={setReminderTab}
+            />
+          ) : (
+            <SegmentedControl
+              ariaLabel="Category"
+              options={CATEGORIES}
+              value={category}
+              onChange={setCategory}
+            />
+          )}
         </div>
 
+        {top === "following" && user && (
+          <div className="mt-4">
+            <SubscribeBanner />
+          </div>
+        )}
+
         {!user && !authLoading && (
-          <div className="mt-10 text-center">
-            <p className="text-sm text-muted">Sign in to build your library.</p>
-            <Link
-              href="/auth/login"
-              className="mt-3 inline-block text-sm font-medium text-text underline underline-offset-4"
-            >
-              Sign in
-            </Link>
-          </div>
+          <EmptyState
+            message="Sign in to keep track of what you follow and watch."
+            actionLabel="Sign in"
+            href="/auth/login?next=/library"
+          />
         )}
 
-        {(loading || authLoading) && user && (
-          <div className="mt-5 grid grid-cols-3 gap-3">
+        {showSkeleton && user && (
+          <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-5">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="aspect-[9/16] w-full" />
+              <div key={i}>
+                <Skeleton className="aspect-[3/4] w-full rounded-lg" />
+                <Skeleton className="mt-2 h-3.5 w-4/5" />
+                <Skeleton className="mt-1.5 h-3 w-1/2" />
+              </div>
             ))}
           </div>
         )}
 
-        {!loading && user && (
-          <div key={tab} className="fade-in mt-5 grid grid-cols-3 gap-x-3 gap-y-4">
-            {items.map((t) => (
-              <TitleCard key={t.id} title={t} size="sm" />
-            ))}
-            {!items.length && (
-              <p className="col-span-3 mt-8 text-center text-sm text-muted">
-                {tab === "list" ? "Nothing saved yet." : "No watch history yet."}
-              </p>
-            )}
+        {error && user && items === null && (
+          <div className="mt-12 text-center">
+            <p className="text-sm text-muted">Couldn&apos;t load your list.</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={refresh}>
+              Try again
+            </Button>
           </div>
+        )}
+
+        {user && items && items.length === 0 && <EmptyState />}
+
+        {user && items && items.length > 0 && (
+          <div
+            key={`${kind}-${category}`}
+            className="fade-in mt-5"
+            style={{ paddingBottom: editing ? "4.5rem" : 0 }}
+          >
+            {top === "history" ? (
+              <div className="space-y-6">
+                {groups.map((group) => (
+                  <section key={group.label}>
+                    <h2 className="mb-3 text-[19px] font-medium text-text">{group.label}</h2>
+                    <div className="space-y-4">
+                      {group.items.map((item) => (
+                        <HistoryRow
+                          key={item.title_id}
+                          item={item}
+                          editing={editing}
+                          selected={selected.has(item.title_id)}
+                          onToggleSelect={() => toggleSelect(item.title_id)}
+                          onToggleFollow={() => toggleFollow(item.title_id, !item.is_following)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+                {items.map((item) => (
+                  <PosterCard
+                    key={item.title_id}
+                    item={item}
+                    editing={editing}
+                    selected={selected.has(item.title_id)}
+                    onToggleSelect={() => toggleSelect(item.title_id)}
+                    upcoming={kind === "reminders_upcoming"}
+                  />
+                ))}
+              </div>
+            )}
+
+            <p className="mt-8 pb-2 text-center text-[15px] text-muted/70">--The End--</p>
+          </div>
+        )}
+
+        {error && items !== null && (
+          <p className="mt-4 text-center text-[13px] text-crimson">
+            Something went wrong: {error}
+          </p>
         )}
       </div>
+
+      {editing && (
+        <EditBar
+          selectedCount={selected.size}
+          total={total}
+          actionLabel={actionLabel}
+          onToggleAll={toggleAll}
+          onAction={() => setConfirmOpen(true)}
+        />
+      )}
+
+      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title={confirmCopy.title}>
+        <div className="px-5 pb-5">
+          <p className="text-[14px] leading-relaxed text-muted">
+            {selected.size === 1 ? "1 title" : `${selected.size} titles`}. {confirmCopy.body}
+          </p>
+          <div className="mt-5 flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={removeSelected}>
+              {actionLabel}
+            </Button>
+          </div>
+        </div>
+      </BottomSheet>
     </PullToRefresh>
   );
 }

@@ -4,6 +4,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Upload, Check, Plus, Trash2 } from "lucide-react";
@@ -153,6 +154,7 @@ export default function UploadPage() {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genre, setGenre] = useState("");
+  const [category, setCategory] = useState<Category>(DEFAULT_CATEGORY);
   const [contentRating, setContentRating] = useState<ContentRating>("13+");
 
   // episode/part fields (step 2)
@@ -249,6 +251,7 @@ export default function UploadPage() {
         content_type: contentType,
         poster_url: posterUrl,
         genre: genre || null,
+        category,
         content_rating: contentRating,
         status: "draft",
       })
@@ -518,6 +521,19 @@ export default function UploadPage() {
             onChange={(e) => setTitleName(e.target.value)}
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
           />
+          <select
+            required
+            value={category}
+            onChange={(e) => setCategory(e.target.value as Category)}
+            aria-label="Category"
+            className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
           <select
             required
             value={genre}
