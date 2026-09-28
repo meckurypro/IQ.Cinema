@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { Lock, Play, Check } from "lucide-react";
 import clsx from "clsx";
-import { BottomSheet } from "@/components/shared/BottomSheet";
+import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 
 export type TrayEpisode = {
   id: string;
@@ -22,6 +22,7 @@ export function EpisodeTray({
   freeCount,
   unlockedIds,
   defaultCost,
+  onSelect,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,6 +32,9 @@ export function EpisodeTray({
   freeCount: number;
   unlockedIds: Set<string>;
   defaultCost: number;
+  // When the tray is opened over the player, picking an episode scrolls the
+  // feed to it instead of navigating (no reload, history stays clean).
+  onSelect?: (episodeId: string) => void;
 }) {
   return (
     <BottomSheet open={open} onClose={onClose} title={`Episodes · ${episodes.length}`}>
@@ -42,21 +46,16 @@ export function EpisodeTray({
           const isCurrent = ep.id === currentEpisodeId;
           const cost = ep.unlock_cost_coins ?? defaultCost;
 
-          return (
-            <Link
-              key={ep.id}
-              href={`/watch/${ep.id}`}
-              onClick={onClose}
-              aria-current={isCurrent}
-              className={clsx(
-                "relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border text-[13px] font-semibold transition-colors",
-                isCurrent
-                  ? "border-transparent bg-gradient-to-r from-pink to-crimson text-white"
-                  : isUnlocked
-                  ? "border-border bg-surface-raised text-text active:bg-border/60"
-                  : "border-border bg-surface-raised text-muted active:bg-border/60"
-              )}
-            >
+          const className = clsx(
+            "relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border text-[13px] font-semibold transition-colors",
+            isCurrent
+              ? "border-transparent bg-gradient-to-r from-pink to-crimson text-white"
+              : isUnlocked
+              ? "border-border bg-surface-raised text-text active:bg-border/60"
+              : "border-border bg-surface-raised text-muted active:bg-border/60"
+          );
+          const content = (
+            <>
               {isCurrent ? (
                 <Play size={11} className="fill-white" />
               ) : isUnlocked ? (
@@ -68,6 +67,29 @@ export function EpisodeTray({
               {!isUnlocked && !isCurrent && (
                 <span className="text-[9px] font-normal text-muted">{cost}c</span>
               )}
+            </>
+          );
+
+          return onSelect ? (
+            <button
+              key={ep.id}
+              type="button"
+              aria-current={isCurrent}
+              onClick={() => onSelect(ep.id)}
+              className={className}
+            >
+              {content}
+            </button>
+          ) : (
+            <Link
+              key={ep.id}
+              href={`/watch/${ep.id}`}
+              replace
+              onClick={() => markSheetNavigating()}
+              aria-current={isCurrent}
+              className={className}
+            >
+              {content}
             </Link>
           );
         })}

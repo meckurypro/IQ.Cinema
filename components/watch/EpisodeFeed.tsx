@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
+import { episodePath } from "@/lib/links";
 import { PlayerTopBar } from "@/components/watch/PlayerTopBar";
 import { SpeedSheet } from "@/components/watch/SpeedSheet";
 import { MoreSheet } from "@/components/watch/MoreSheet";
@@ -38,6 +39,7 @@ type FeedEpisode = {
 };
 
 type TitleData = {
+  slug: string;
   title: string;
   synopsis: string | null;
   content_rating: string | null;
@@ -88,6 +90,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
   const lastPlayheadRef = useRef<number | null>(null);
   const lastReportedRef = useRef(0);
   const didInitialScroll = useRef(false);
+  const slugRef = useRef<string | null>(null);
 
   // Load every published episode for this title, in order, plus the title
   // itself and free/pricing settings — everything the whole feed needs up
@@ -112,7 +115,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
           .order("episode_number", { ascending: true }),
         supabase
           .from("titles")
-          .select("title, synopsis, content_rating, poster_url, total_unique_views, free_episode_count")
+          .select("slug, title, synopsis, content_rating, poster_url, total_unique_views, free_episode_count")
           .eq("id", seed.title_id)
           .single(),
         supabase
@@ -123,6 +126,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
 
       setEpisodes((eps as FeedEpisode[]) ?? []);
       setTitleData((t as TitleData) ?? null);
+      slugRef.current = (t as TitleData | null)?.slug ?? null;
       setFreeCount(t?.free_episode_count ?? settings?.default_free_episodes ?? 4);
       setDefaultUnlockCost(settings?.default_episode_unlock_coins ?? 30);
       setEngagement((prev) => {
@@ -282,7 +286,12 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
             if (id) {
               setActiveId(id);
               if (typeof window !== "undefined") {
-                window.history.replaceState(null, "", `/watch/${id}`);
+                const num = Number(entry.target.getAttribute("data-episode-number"));
+                window.history.replaceState(
+                  window.history.state,
+                  "",
+                  episodePath(slugRef.current, num, id)
+                );
               }
             }
           }
@@ -293,6 +302,26 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
     for (const el of slideRefs.current.values()) observer.observe(el);
     return () => observer.disconnect();
   }, [episodes]);
+
+  // If the active episode changed while a sheet was open (auto-advance), its
+  // closing pops a history entry that still holds the older URL. Re-apply the
+  // active episode's URL after any Back/pop that stays on a watch page.
+  const activeRef = useRef<FeedEpisode | null>(null);
+  useEffect(() => {
+    activeRef.current = episodes?.find((e) => e.id === activeId) ?? null;
+  }, [episodes, activeId]);
+  useEffect(() => {
+    function resync() {
+      window.setTimeout(() => {
+        const ep = activeRef.current;
+        if (!ep || !window.location.pathname.startsWith("/watch/")) return;
+        const want = episodePath(slugRef.current, ep.episode_number, ep.id);
+        if (window.location.pathname !== want) window.history.replaceState(window.history.state, "", want);
+      }, 60);
+    }
+    window.addEventListener("popstate", resync);
+    return () => window.removeEventListener("popstate", resync);
+  }, []);
 
   // Land on the deep-linked episode instantly, no scroll animation.
   useEffect(() => {
@@ -398,7 +427,11 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
   }
 
   async function handleShare(episode: FeedEpisode) {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/watch/${episode.id}` : "";
+    const path = episodePath(titleData?.slug, episode.episode_number, episode.id);
+    const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : "";
+    const heading = titleData?.title
+      ? `${titleData.title} · Episode ${episode.episode_number}`
+      : `Episode ${episode.episode_number}`;
     const { data } = await supabase.rpc("record_episode_share", { p_episode_id: episode.id });
     setEngagement((prev) => ({
       ...prev,
@@ -410,7 +443,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ title: episode.name ?? `Episode ${episode.episode_number}`, url });
+        await navigator.share({ title: heading, text: `Watch ${heading} on IQ Cinema`, url });
         return;
       } catch {
         return;
@@ -472,6 +505,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
                 else slideRefs.current.delete(ep.id);
               }}
               data-episode-id={ep.id}
+              data-episode-number={ep.episode_number}
               className="relative h-full w-full snap-start"
             >
               {unlocked ? (
@@ -616,6 +650,20 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
         freeCount={freeCount}
         unlockedIds={unlockedIds}
         defaultCost={defaultUnlockCost}
+        onSelect={(id) => {
+          // Scroll only after the sheet's history entry has popped, so the
+          // URL update that follows the scroll lands on the right entry.
+          setShowTray(false);
+          let done = false;
+          const go = () => {
+            if (done) return;
+            done = true;
+            window.removeEventListener("popstate", go);
+            slideRefs.current.get(id)?.scrollIntoView({ block: "start" });
+          };
+          window.addEventListener("popstate", go);
+          window.setTimeout(go, 400);
+        }}
       />
 
       <TitleDetailsSheet

@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { BottomSheet } from "@/components/shared/BottomSheet";
+import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCount } from "@/lib/format";
 
@@ -124,7 +124,7 @@ export function TitleDetailsSheet({
           ) : similar.length > 0 ? (
             <div className="flex gap-2.5 overflow-x-auto pb-1">
               {similar.map((t) => (
-                <Link key={t.id} href={`/title/${t.slug}`} onClick={onClose} className="w-[86px] shrink-0">
+                <Link key={t.id} href={`/title/${t.slug}`} replace onClick={() => markSheetNavigating()} className="w-[86px] shrink-0">
                   <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-surface-raised">
                     {t.poster_url && (
                       <Image src={t.poster_url} alt={t.title} fill className="object-cover" />
