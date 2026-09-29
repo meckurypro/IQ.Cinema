@@ -5,12 +5,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Play, ChevronRight } from "lucide-react";
+import { Play, ChevronRight, Flame, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
 import { getDeviceId } from "@/lib/device";
 import { useAuth } from "@/hooks/useAuth";
 import { titlePath } from "@/lib/links";
+import { formatCount } from "@/lib/format";
+import { EMPTY_COPY, parseForYouTab, rpcTabFor, type ForYouTab } from "@/lib/forYouTabs";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
 import { CommentsSheet } from "@/components/watch/CommentsSheet";
@@ -39,6 +41,10 @@ type PromoItem = {
   total_episodes: number;
   total_unique_views: number;
   published_at: string | null;
+  // Only set by get_for_you_feed_v2 (not by the by-slug lookup).
+  is_new?: boolean;
+  feed_rank?: number;
+  recent_views?: number;
 };
 
 type Engagement = { saved: boolean; saveCount: number; commentCount: number; shareCount: number };
@@ -59,6 +65,11 @@ export function ForYouFeed() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const supabase = createClient();
+
+  // Tab + collection category live in state (seeded from ?tab=), so switching
+  // never navigates — it just swaps which promo episodes fill the feed.
+  const [tab, setTab] = useState<ForYouTab>(() => parseForYouTab(searchParams.get("tab")));
+  const [category, setCategory] = useState<string | null>(null);
 
   const [items, setItems] = useState<PromoItem[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -87,6 +98,11 @@ export function ForYouFeed() {
   const lastPlayheadRef = useRef<number | null>(null);
   const lastReportedRef = useRef(0);
   const injectedSlug = useRef<string | null>(null);
+  // Rows fetched so far for the current tab (offset pagination — a ranked
+  // list has no stable timestamp cursor), and a token so a slow response for
+  // a tab we've already left can't overwrite the current one.
+  const offsetRef = useRef(0);
+  const feedTokenRef = useRef(0);
 
   const seedEngagement = useCallback((batch: PromoItem[]) => {
     setEngagement((prev) => {
@@ -96,18 +112,66 @@ export function ForYouFeed() {
     });
   }, []);
 
-  // First page.
+  const fetchPage = useCallback(
+    async (offset: number): Promise<PromoItem[] | null> => {
+      const { data, error } = await supabase.rpc("get_for_you_feed_v2", {
+        p_tab: rpcTabFor(tab),
+        p_limit: PAGE_SIZE,
+        p_offset: offset,
+        p_category: tab === "collections" ? category : null,
+      });
+      if (!error) return (data as PromoItem[]) ?? [];
+      // v2 not deployed on this database yet: the original newest-first feed
+      // still serves the default view, so For You never goes blank.
+      if (tab === "for_you" && offset === 0) {
+        const legacy = await supabase.rpc("get_for_you_feed", { p_limit: PAGE_SIZE, p_before: null });
+        if (!legacy.error) return (legacy.data as PromoItem[]) ?? [];
+      }
+      console.error("get_for_you_feed_v2 failed", error.message);
+      return null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tab, category]
+  );
+
+  // First page — reruns whenever the tab or collection category changes.
   useEffect(() => {
+    const token = ++feedTokenRef.current;
+    setItems(null);
+    setActiveId(null);
+    setExhausted(false);
+    setLoadingMore(false);
+    setShowComments(false);
+    setShowDetails(false);
+    setShowTray(false);
+    offsetRef.current = 0;
+    containerRef.current?.scrollTo({ top: 0 });
     (async () => {
-      const { data } = await supabase.rpc("get_for_you_feed", { p_limit: PAGE_SIZE, p_before: null });
-      const batch = (data as PromoItem[]) ?? [];
+      const batch = (await fetchPage(0)) ?? [];
+      if (token !== feedTokenRef.current) return;
+      offsetRef.current = batch.length;
       setItems(batch);
       if (batch[0]) setActiveId(batch[0].episode_id);
       seedEngagement(batch);
       if (batch.length < PAGE_SIZE) setExhausted(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tab, category]);
+
+  // Keep the URL shareable (/for-you?tab=trending) without triggering a
+  // navigation or re-render.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (tab === "for_you") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [tab]);
+
+  function changeTab(next: ForYouTab) {
+    if (next === tab) return;
+    setTab(next);
+    if (next !== "collections") setCategory(null);
+  }
 
   // A "Similar titles" tap from inside the details sheet lands here as
   // ?title=<slug> — fetch just that title's promo, splice it in right after
@@ -134,7 +198,7 @@ export function ForYouFeed() {
       requestAnimationFrame(() => {
         slideRefs.current.get(row.episode_id)?.scrollIntoView({ block: "start" });
       });
-      router.replace("/for-you", { scroll: false });
+      router.replace(tab === "for_you" ? "/for-you" : `/for-you?tab=${tab}`, { scroll: false });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, items]);
@@ -205,20 +269,23 @@ export function ForYouFeed() {
     const idx = items.findIndex((i) => i.episode_id === activeId);
     if (idx < items.length - 2) return;
     setLoadingMore(true);
-    const cursor = items[items.length - 1]?.published_at ?? null;
-    supabase
-      .rpc("get_for_you_feed", { p_limit: PAGE_SIZE, p_before: cursor })
-      .then(({ data }) => {
-        const batch = (data as PromoItem[]) ?? [];
-        const existing = new Set(items.map((i) => i.episode_id));
-        const fresh = batch.filter((i) => !existing.has(i.episode_id));
-        if (fresh.length) {
-          setItems((prev) => [...(prev ?? []), ...fresh]);
-          seedEngagement(fresh);
-        }
-        if (batch.length < PAGE_SIZE) setExhausted(true);
+    const token = feedTokenRef.current;
+    fetchPage(offsetRef.current).then((batch) => {
+      if (token !== feedTokenRef.current) return;
+      if (!batch) {
         setLoadingMore(false);
-      });
+        return;
+      }
+      offsetRef.current += batch.length;
+      const existing = new Set(items.map((i) => i.episode_id));
+      const fresh = batch.filter((i) => !existing.has(i.episode_id));
+      if (fresh.length) {
+        setItems((prev) => [...(prev ?? []), ...fresh]);
+        seedEngagement(fresh);
+      }
+      if (batch.length < PAGE_SIZE) setExhausted(true);
+      setLoadingMore(false);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, items, exhausted, loadingMore]);
 
@@ -387,15 +454,26 @@ export function ForYouFeed() {
     if (data?.id) setFullEpisodeId(data.id);
   }
 
+  const header = (
+    <ForYouHeader tab={tab} onTabChange={changeTab} category={category} onCategoryChange={setCategory} />
+  );
+
   if (!items) {
-    return <div className="h-dvh bg-black" />;
+    return (
+      <div className="relative h-dvh w-full overflow-hidden bg-black">
+        {header}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+        </div>
+      </div>
+    );
   }
 
   const active = items.find((i) => i.episode_id === activeId) ?? items[0];
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
-      <ForYouHeader />
+      {header}
       <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
         {items.map((item) => {
           // The promo unmounts while the full movie is up, so only one video plays.
@@ -428,6 +506,22 @@ export function ForYouFeed() {
                   }}
                   bottomContent={
                     <div className="flex flex-col gap-2">
+                      {tab === "trending" && item.feed_rank ? (
+                        <span className="flex w-fit items-center gap-1 rounded-full bg-gradient-to-r from-pink to-crimson px-2.5 py-1 text-[11px] font-bold text-white">
+                          <Flame size={12} className="fill-white" />
+                          #{item.feed_rank} Trending
+                          {(item.recent_views ?? 0) > 0 && (
+                            <span className="font-medium text-white/85">
+                              · {formatCount(item.recent_views ?? 0)} this week
+                            </span>
+                          )}
+                        </span>
+                      ) : item.is_new ? (
+                        <span className="flex w-fit items-center gap-1 rounded-full bg-pink px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                          <Sparkles size={12} />
+                          New
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         data-tap
@@ -509,9 +603,7 @@ export function ForYouFeed() {
 
         {!items.length && (
           <div className="flex h-full items-center justify-center px-8 text-center">
-            <p className="text-[14px] text-white/70">
-              Nothing on For You yet — check back once creators have set a promo episode.
-            </p>
+            <p className="text-[14px] text-white/70">{EMPTY_COPY[tab]}</p>
           </div>
         )}
       </div>
