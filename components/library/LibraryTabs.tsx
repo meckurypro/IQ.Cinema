@@ -3,7 +3,6 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { SquarePen } from "lucide-react";
 import clsx from "clsx";
 
 export type TopTab = "following" | "history" | "reminders";
@@ -14,18 +13,15 @@ const TABS: { value: TopTab; label: string }[] = [
   { value: "reminders", label: "Reminder Set" },
 ];
 
+// Same type and colours as the Home tabs (components/home/CategoryTabs.tsx).
+// At that size the three titles take ~330px, so this row holds nothing else:
+// the edit button lives beside the filter below (see EditToggle).
 export function LibraryTabs({
   value,
   onChange,
-  editing,
-  editDisabled,
-  onToggleEdit,
 }: {
   value: TopTab;
   onChange: (tab: TopTab) => void;
-  editing: boolean;
-  editDisabled: boolean;
-  onToggleEdit: () => void;
 }) {
   const refs = useRef<Record<TopTab, HTMLButtonElement | null>>({
     following: null,
@@ -48,47 +44,38 @@ export function LibraryTabs({
   }, [value]);
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div role="tablist" aria-label="My List" className="relative flex gap-6 pb-3">
-        {TABS.map(({ value: tab, label }) => (
-          <button
-            key={tab}
-            ref={(el) => {
-              refs.current[tab] = el;
-            }}
-            role="tab"
-            aria-selected={value === tab}
-            onClick={() => onChange(tab)}
-            className={clsx(
-              "whitespace-nowrap text-[21px] leading-tight transition-colors",
-              value === tab ? "font-semibold text-text" : "font-medium text-muted"
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        {center !== null && (
-          <span
-            aria-hidden
-            className="absolute bottom-0 h-[3px] w-7 -translate-x-1/2 rounded-full bg-pink transition-[left] duration-300 ease-out"
-            style={{ left: center }}
-          />
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={onToggleEdit}
-        disabled={editDisabled && !editing}
-        aria-label={editing ? "Done editing" : "Edit list"}
-        className="-mt-0.5 grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-1 text-text transition-opacity disabled:opacity-30"
-      >
-        {editing ? (
-          <span className="px-2 text-[15px] font-semibold text-pink">Done</span>
-        ) : (
-          <SquarePen size={24} strokeWidth={1.75} />
-        )}
-      </button>
+    // On phones narrower than the titles need (~330px) the strip scrolls
+    // inside itself instead of widening the whole page — a page wider than
+    // the screen is what made the bottom nav drift out of view.
+    <div
+      role="tablist"
+      aria-label="My List"
+      className="no-scrollbar relative flex gap-4 overflow-x-auto pb-3 pt-1 min-[375px]:gap-5"
+    >
+      {TABS.map(({ value: tab, label }) => (
+        <button
+          key={tab}
+          ref={(el) => {
+            refs.current[tab] = el;
+          }}
+          role="tab"
+          aria-selected={value === tab}
+          onClick={() => onChange(tab)}
+          className={clsx(
+            "shrink-0 whitespace-nowrap text-[16px] font-extrabold uppercase tracking-wide transition-colors",
+            value === tab ? "text-text" : "text-muted"
+          )}
+        >
+          {label}
+        </button>
+      ))}
+      {center !== null && (
+        <span
+          aria-hidden
+          className="absolute bottom-0 h-[3px] w-7 -translate-x-1/2 rounded-full bg-pink transition-[left] duration-300 ease-out"
+          style={{ left: center }}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import clsx from "clsx";
 
@@ -23,6 +23,28 @@ export function PullToRefresh({
   const startY = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Any CSS transform on an element — even translateY(0) — makes it the
+  // containing block for position:fixed descendants, so a fixed bar inside
+  // this wrapper (e.g. My List's edit bar) gets glued to the bottom of the
+  // *content* instead of the screen. So the content only carries a transform
+  // while it's actually displaced: during a pull, and for the short return.
+  const [settling, setSettling] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
+
+  // Every path back to rest goes through here. `settling` is set in the same
+  // batch as pull -> 0, so there is never a render where the transform is
+  // dropped before the return animation has run. (Not transitionend to clear
+  // it: that doesn't fire if the tab is hidden or motion is reduced, which
+  // would leave the transform — and the bug — stuck on.)
+  function releasePull() {
+    setSettling(true);
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => setSettling(false), 250);
+    setPull(0);
+  }
+  const displaced = pull > 0 || settling;
+
   function handleTouchStart(e: React.TouchEvent) {
     if (refreshing) return;
     // These pages scroll the document (no inner overflow container), so the
@@ -37,7 +59,7 @@ export function PullToRefresh({
     if (startY.current === null || refreshing) return;
     const delta = e.touches[0].clientY - startY.current;
     if (delta <= 0) {
-      setPull(0);
+      if (pull > 0) releasePull();
       return;
     }
     // Rubber-band: each extra pixel of finger movement buys less and less
@@ -50,13 +72,14 @@ export function PullToRefresh({
   async function handleTouchEnd() {
     if (startY.current === null) return;
     startY.current = null;
+    const wasDisplaced = pull > 0;
     if (pull >= TRIGGER_DISTANCE) {
       setRefreshing(true);
       setPull(TRIGGER_DISTANCE);
       await onRefresh();
       setRefreshing(false);
     }
-    setPull(0);
+    if (wasDisplaced) releasePull();
   }
 
   const progress = Math.min(1, pull / TRIGGER_DISTANCE);
@@ -89,10 +112,14 @@ export function PullToRefresh({
       </div>
 
       <div
-        style={{
-          transform: `translateY(${pull}px)`,
-          transition: startY.current ? "none" : "transform 200ms ease-out",
-        }}
+        style={
+          displaced
+            ? {
+                transform: `translateY(${pull}px)`,
+                transition: startY.current ? "none" : "transform 200ms ease-out",
+              }
+            : undefined
+        }
       >
         {children}
       </div>

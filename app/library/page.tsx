@@ -15,6 +15,7 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { LibraryTabs, type TopTab } from "@/components/library/LibraryTabs";
+import { EditToggle } from "@/components/library/EditToggle";
 import { SegmentedControl } from "@/components/library/SegmentedControl";
 import { SubscribeBanner } from "@/components/library/SubscribeBanner";
 import { PosterCard } from "@/components/library/PosterCard";
@@ -123,31 +124,28 @@ export default function LibraryPage() {
 
   return (
     <PullToRefresh onRefresh={refresh}>
-      <div className="fade-in px-4 pt-5">
-        <LibraryTabs
-          value={top}
-          onChange={setTop}
-          editing={editing}
-          editDisabled={!total}
-          onToggleEdit={toggleEdit}
-        />
+      <div className="fade-in px-4 pt-3">
+        <LibraryTabs value={top} onChange={setTop} />
 
-        <div className="mt-1">
-          {top === "reminders" ? (
-            <SegmentedControl
-              ariaLabel="Reminder status"
-              options={REMINDER_OPTIONS}
-              value={reminderTab}
-              onChange={setReminderTab}
-            />
-          ) : (
-            <SegmentedControl
-              ariaLabel="Category"
-              options={CATEGORIES}
-              value={category}
-              onChange={setCategory}
-            />
-          )}
+        <div className="mt-1 flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            {top === "reminders" ? (
+              <SegmentedControl
+                ariaLabel="Reminder status"
+                options={REMINDER_OPTIONS}
+                value={reminderTab}
+                onChange={setReminderTab}
+              />
+            ) : (
+              <SegmentedControl
+                ariaLabel="Category"
+                options={CATEGORIES}
+                value={category}
+                onChange={setCategory}
+              />
+            )}
+          </div>
+          <EditToggle editing={editing} disabled={!total} onToggle={toggleEdit} />
         </div>
 
         {top === "following" && user && (
