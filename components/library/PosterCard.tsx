@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import clsx from "clsx";
 import { progressLabel, watchHref, type MyListItem } from "@/lib/myList";
 
@@ -44,8 +43,7 @@ export function PosterCard({
         )}
 
         {item.has_new_episode && (
-          <span className="absolute right-0 top-0 flex items-center gap-1 rounded-bl-lg bg-gradient-to-r from-orange-500 to-pink px-2 py-1 text-[12px] font-bold leading-none text-white">
-            <Sparkles size={12} className="fill-white" />
+          <span className="absolute right-0 top-0 rounded-bl-lg bg-gradient-to-r from-orange-500 to-pink px-2 py-1 text-[12px] font-bold leading-none text-white">
             New EP
           </span>
         )}

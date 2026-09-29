@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Play, Pause, Loader2, RotateCcw, RotateCw } from "lucide-react";
+import { Play, Pause, Loader2, RotateCcw, RotateCw, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { SB_FRAME_H, SB_FRAME_W, storyboardLayout } from "@/lib/storyboard";
 
@@ -10,8 +10,21 @@ const DOUBLE_TAP_MS = 280;
 const SEEK_SECONDS = 10;
 const PREVIEW_W = 90;
 const PREVIEW_H = 160;
-const STALL_MS = 8000;
+// How long a seek/buffer may sit without data before we intervene. Mobile
+// networks are slow, not broken, so this is generous — and while bytes are
+// still arriving we keep waiting instead of aborting the in-flight request.
+const STALL_MS = 12000;
+// Only show the spinner if the wait outlasts this, so quick seeks don't flicker.
+const SPINNER_DELAY_MS = 250;
 const MAX_RECOVERIES = 2;
+
+function isBuffered(v: HTMLVideoElement, t: number) {
+  const r = v.buffered;
+  for (let i = 0; i < r.length; i++) {
+    if (t >= r.start(i) - 0.05 && t <= r.end(i) - 0.25) return true;
+  }
+  return false;
+}
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -75,6 +88,7 @@ export function VideoPlayer({
   const thumbRef = useRef<HTMLDivElement>(null);
   const currentTimeRef = useRef<HTMLSpanElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  const bufferedRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapSide = useRef<"left" | "right" | null>(null);
@@ -90,6 +104,11 @@ export function VideoPlayer({
 
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(true);
+  // `buffering` is the truth; `spinner` is the delayed, user-facing version.
+  const [spinner, setSpinner] = useState(false);
+  // Set once automatic recovery has been exhausted: we stop spinning and
+  // offer an explicit retry instead of an endless loading state.
+  const [failed, setFailed] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [duration, setDuration] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -149,6 +168,42 @@ export function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging, scrubTime, spriteReady]);
 
+  useEffect(() => {
+    if (!buffering) {
+      setSpinner(false);
+      return;
+    }
+    const t = setTimeout(() => setSpinner(true), SPINNER_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [buffering]);
+
+  function updateBuffered() {
+    const v = videoRef.current;
+    const el = bufferedRef.current;
+    if (!v || !el || !v.duration) return;
+    let end = 0;
+    for (let i = 0; i < v.buffered.length; i++) {
+      if (v.currentTime >= v.buffered.start(i) - 0.05 && v.currentTime <= v.buffered.end(i)) {
+        end = v.buffered.end(i);
+        break;
+      }
+    }
+    el.style.width = `${Math.min(100, (end / v.duration) * 100)}%`;
+  }
+
+  // Single entry point for every seek (scrub release, double-tap): jump, and
+  // only enter the loading state if the target isn't already buffered.
+  function beginSeek(target: number) {
+    const v = videoRef.current;
+    if (!v) return;
+    pendingSeek.current = target;
+    v.currentTime = target;
+    if (!isBuffered(v, target)) {
+      setBuffering(true);
+      armStallWatchdog();
+    }
+  }
+
   function clearStallTimer() {
     if (stallTimer.current) clearTimeout(stallTimer.current);
     stallTimer.current = null;
@@ -158,23 +213,26 @@ export function VideoPlayer({
     clearStallTimer();
     stallStage.current = 0;
     pendingSeek.current = null;
+    setFailed(false);
     setBuffering(false);
   }
 
-  // Two-stage recovery if the element is still starved STALL_MS after a
-  // seek / buffering event: first re-issue the seek at the same spot; if
-  // that also fails, rebuild the stream there with a freshly signed URL.
+  // If the element is still starved STALL_MS after a seek / buffering event:
+  // while the network is still delivering data, keep waiting once more
+  // (re-issuing the seek would abort the in-flight range request and make a
+  // slow connection slower). Otherwise rebuild the stream at the same spot
+  // with a freshly signed URL. If that fails too, surface a Retry button.
   function armStallWatchdog() {
     clearStallTimer();
     stallTimer.current = setTimeout(() => {
       const v = videoRef.current;
-      if (!v || (v.readyState >= 3 && !v.seeking)) {
+      if (!v) return;
+      if (v.readyState >= 3 && !v.seeking) {
         markHealthy();
         return;
       }
-      if (stallStage.current === 0) {
+      if (stallStage.current === 0 && v.networkState === HTMLMediaElement.NETWORK_LOADING) {
         stallStage.current = 1;
-        v.currentTime = pendingSeek.current ?? v.currentTime;
         armStallWatchdog();
         return;
       }
@@ -184,7 +242,13 @@ export function VideoPlayer({
 
   async function recoverStream() {
     const v = videoRef.current;
-    if (!v || recovering.current || recoveries.current >= MAX_RECOVERIES) return;
+    if (!v || recovering.current) return;
+    if (recoveries.current >= MAX_RECOVERIES) {
+      clearStallTimer();
+      setBuffering(false);
+      setFailed(true);
+      return;
+    }
     recovering.current = true;
     recoveries.current += 1;
     const resume = !v.paused || wasPlayingRef.current;
@@ -195,7 +259,11 @@ export function VideoPlayer({
         const fresh = await onRequestFreshSrc();
         if (fresh) url = fresh;
       }
-      if (!url) return;
+      if (!url) {
+        setBuffering(false);
+        setFailed(true);
+        return;
+      }
       setBuffering(true);
       const onMeta = () => {
         v.removeEventListener("loadedmetadata", onMeta);
@@ -238,10 +306,22 @@ export function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showControls, playing]);
 
+  function retry() {
+    recoveries.current = 0;
+    stallStage.current = 0;
+    setFailed(false);
+    setBuffering(true);
+    void recoverStream();
+  }
+
   function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) v.play();
+    if (failed) {
+      retry();
+      return;
+    }
+    if (v.paused) v.play().catch(() => {});
     else v.pause();
   }
 
@@ -249,9 +329,7 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     const target = Math.min(Math.max(0, v.currentTime + seconds), v.duration || Infinity);
-    pendingSeek.current = target;
-    v.currentTime = target;
-    armStallWatchdog();
+    beginSeek(target);
     setSeekFlash({ side, key: Date.now() });
     updateProgressUI(v.currentTime, v.duration);
   }
@@ -325,11 +403,8 @@ export function VideoPlayer({
     setDragging(false);
     const v = videoRef.current;
     if (v) {
-      setBuffering(true);
-      pendingSeek.current = scrubTimeRef.current;
-      v.currentTime = scrubTimeRef.current;
+      beginSeek(scrubTimeRef.current);
       if (wasPlayingRef.current) v.play().catch(() => {});
-      armStallWatchdog();
     }
     scheduleHide();
   }
@@ -372,6 +447,8 @@ export function VideoPlayer({
     return () => ro.disconnect();
   }, [title, synopsis, hasCta]);
 
+  const showSpinner = spinner && playing && !failed;
+
   return (
     <div ref={rootRef} className="relative h-full w-full select-none bg-black">
       <video
@@ -379,7 +456,7 @@ export function VideoPlayer({
         className="h-full w-full object-contain"
         autoPlay={autoPlay}
         playsInline
-        preload="auto"
+        preload={autoPlay ? "auto" : "metadata"}
         poster={posterUrl}
         src={src}
         onPlay={() => setPlaying(true)}
@@ -388,6 +465,14 @@ export function VideoPlayer({
           setShowControls(true);
           clearHideTimer();
         }}
+        onSeeking={(e) => {
+          const v = e.currentTarget;
+          if (!isBuffered(v, v.currentTime)) {
+            setBuffering(true);
+            armStallWatchdog();
+          }
+        }}
+        onProgress={updateBuffered}
         onWaiting={() => {
           setBuffering(true);
           armStallWatchdog();
@@ -406,6 +491,7 @@ export function VideoPlayer({
         onTimeUpdate={(e) => {
           const t = e.currentTarget.currentTime;
           if (!draggingRef.current) updateProgressUI(t, e.currentTarget.duration || duration);
+          updateBuffered();
           onTimeUpdate?.(t);
         }}
         onEnded={onEnded}
@@ -414,12 +500,6 @@ export function VideoPlayer({
       {/* Tap zones: single tap toggles the control layer, a second tap on
           the same side within the window seeks instead. */}
       <div className="absolute inset-0" onClick={handleOverlayTap} />
-
-      {buffering && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <Loader2 size={36} className="animate-spin text-white/90" />
-        </div>
-      )}
 
       {seekFlash && (
         <div
@@ -440,9 +520,13 @@ export function VideoPlayer({
       <div
         className={clsx(
           "pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-200",
-          showControls ? "opacity-100" : "opacity-0"
+          // Stay visible while loading/failed even if the controls are faded.
+          showControls || showSpinner || failed ? "opacity-100" : "opacity-0"
         )}
       >
+        {/* One control, one state: a spinner REPLACES the play/pause icon
+            while we wait for data, so the two can never stack. Tapping it
+            still pauses; when playback has failed it becomes Retry. */}
         <button
           type="button"
           onClick={(e) => {
@@ -450,11 +534,18 @@ export function VideoPlayer({
             setIconPulse((n) => n + 1);
             togglePlay();
           }}
+          aria-label={failed ? "Retry" : showSpinner ? "Loading" : playing ? "Pause" : "Play"}
           className="pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/45 text-white active:scale-95"
         >
-          <span key={iconPulse} className="coin-pop flex items-center justify-center">
-            {playing ? <Pause size={26} className="fill-white" /> : <Play size={26} className="fill-white pl-0.5" />}
-          </span>
+          {failed ? (
+            <RefreshCw size={24} />
+          ) : showSpinner ? (
+            <Loader2 size={28} className="animate-spin" />
+          ) : (
+            <span key={iconPulse} className="coin-pop flex items-center justify-center">
+              {playing ? <Pause size={26} className="fill-white" /> : <Play size={26} className="fill-white pl-0.5" />}
+            </span>
+          )}
         </button>
       </div>
 
@@ -603,14 +694,19 @@ export function VideoPlayer({
           >
             <div
               className={clsx(
-                "w-full overflow-hidden rounded-full transition-all duration-150",
+                "relative w-full overflow-hidden rounded-full transition-all duration-150",
                 dragging ? "h-2.5 bg-white/60" : "h-1 bg-white/25"
               )}
             >
               <div
+                ref={bufferedRef}
+                className="absolute inset-y-0 left-0 rounded-full bg-white/35"
+                style={{ width: "0%" }}
+              />
+              <div
                 ref={fillRef}
                 className={clsx(
-                  "h-full rounded-full bg-pink transition-[filter] duration-150",
+                  "absolute inset-y-0 left-0 rounded-full bg-pink transition-[filter] duration-150",
                   dragging && "brightness-125 saturate-150"
                 )}
                 style={{ width: "0%" }}

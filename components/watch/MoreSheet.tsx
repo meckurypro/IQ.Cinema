@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronRight, Download, MonitorPlay, Pause, Play, RotateCw, Sparkles } from "lucide-react";
+import { Check, ChevronRight, Download, MonitorPlay, Pause, Play, RotateCw } from "lucide-react";
 import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 import { ProgressRing } from "@/components/downloads/ProgressRing";
 import type { OfflineEpisode } from "@/lib/offline/db";
@@ -116,21 +116,6 @@ export function MoreSheet({
                 <Pause size={12} className="fill-current" />
               </ProgressRing>
             </button>
-          </div>
-        )}
-
-        {/* Fully downloaded, now burning the watermark into it before it's
-            playable offline — not a network transfer, so there's nothing to
-            pause here, just progress. */}
-        {downloadState && status === "processing" && (
-          <div className="flex items-center justify-between rounded-md px-1.5 py-2.5">
-            <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
-              <Sparkles size={18} className="text-muted" />
-              Finishing up…
-            </span>
-            <ProgressRing progress={downloadState.processProgress ?? -1} size={34}>
-              <Sparkles size={12} />
-            </ProgressRing>
           </div>
         )}
 

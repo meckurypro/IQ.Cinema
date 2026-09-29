@@ -3,7 +3,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pause, Play, RotateCw, Sparkles } from "lucide-react";
+import { Pause, Play, RotateCw } from "lucide-react";
 import clsx from "clsx";
 import { formatDuration } from "@/lib/format";
 import { useBlobUrl } from "@/hooks/useOfflineDownloads";
@@ -24,8 +24,8 @@ function statusLine(ep: OfflineEpisode) {
       return "Waiting to download…";
     case "downloading":
       return pct ? `Downloading ${pct}` : "Downloading…";
-    case "processing":
-      return "Finishing up…";
+    case "processing": // legacy rows only; nothing is processed on-device anymore
+      return formatDuration(ep.durationSeconds) || "Ready to watch";
     case "paused":
       return ep.error === "offline" ? "Waiting for connection" : `Paused${pct ? ` · ${pct}` : ""}`;
     case "error":
@@ -54,7 +54,6 @@ export function EpisodeRow({
   const posterUrl = useBlobUrl(poster);
   const complete = episode.status === "complete";
   const inFlight = episode.status === "downloading" || episode.status === "queued";
-  const processing = episode.status === "processing";
 
   const content = (
     <>
@@ -87,16 +86,6 @@ export function EpisodeRow({
     >
       <Play size={16} className="ml-0.5 fill-white" />
     </Link>
-  ) : processing ? (
-    // Not interactive — there's no network transfer to pause/resume here,
-    // just a local encode running to completion.
-    <ProgressRing
-      progress={episode.processProgress != null ? episode.processProgress : -1}
-      size={40}
-      className="shrink-0"
-    >
-      <Sparkles size={14} />
-    </ProgressRing>
   ) : (
     <button
       type="button"
