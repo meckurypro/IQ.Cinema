@@ -3,23 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Bookmark } from "lucide-react";
-import clsx from "clsx";
 import { progressLabel, watchHref, type MyListItem } from "@/lib/myList";
-import { SelectDot } from "./SelectDot";
 
 // Horizontal row for the History tab. The bookmark on the right follows or
 // unfollows the title without leaving the list.
 export function HistoryRow({
   item,
-  editing,
-  selected,
-  onToggleSelect,
   onToggleFollow,
 }: {
   item: MyListItem;
-  editing: boolean;
-  selected: boolean;
-  onToggleSelect: () => void;
   onToggleFollow: () => void;
 }) {
   const content = (
@@ -60,46 +52,25 @@ export function HistoryRow({
 
   return (
     <div className="flex items-center gap-3">
-      {editing && (
-        <SelectDot
-          selected={selected}
-          className={clsx(!selected && "border-muted/60 bg-transparent")}
-        />
-      )}
+      <Link href={watchHref(item)} className="flex min-w-0 flex-1 gap-3.5">
+        {content}
+      </Link>
 
-      {editing ? (
-        <button
-          type="button"
-          onClick={onToggleSelect}
-          aria-pressed={selected}
-          aria-label={`${selected ? "Deselect" : "Select"} ${item.title.trim()}`}
-          className="flex min-w-0 flex-1 gap-3.5 text-left"
-        >
-          {content}
-        </button>
-      ) : (
-        <Link href={watchHref(item)} className="flex min-w-0 flex-1 gap-3.5">
-          {content}
-        </Link>
-      )}
-
-      {!editing && (
-        <button
-          type="button"
-          onClick={onToggleFollow}
-          aria-pressed={item.is_following}
-          aria-label={item.is_following ? "Unfollow" : "Follow"}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors active:bg-surface-raised"
-        >
-          <span key={String(item.is_following)} className="coin-pop">
-            <Bookmark
-              size={28}
-              strokeWidth={1.75}
-              className={item.is_following ? "fill-pink text-pink" : "text-muted"}
-            />
-          </span>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onToggleFollow}
+        aria-pressed={item.is_following}
+        aria-label={item.is_following ? "Unfollow" : "Follow"}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors active:bg-surface-raised"
+      >
+        <span key={String(item.is_following)} className="coin-pop">
+          <Bookmark
+            size={28}
+            strokeWidth={1.75}
+            className={item.is_following ? "fill-pink text-pink" : "text-muted"}
+          />
+        </span>
+      </button>
     </div>
   );
 }

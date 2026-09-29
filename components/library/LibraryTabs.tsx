@@ -14,8 +14,7 @@ const TABS: { value: TopTab; label: string }[] = [
 ];
 
 // Same type and colours as the Home tabs (components/home/CategoryTabs.tsx).
-// At that size the three titles take ~330px, so this row holds nothing else:
-// the edit button lives beside the filter below (see EditToggle).
+// At that size the three titles take ~330px, so this row holds nothing else.
 export function LibraryTabs({
   value,
   onChange,
