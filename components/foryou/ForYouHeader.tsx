@@ -15,7 +15,7 @@ import clsx from "clsx";
 const tabs = [
   { key: "for-you", label: "For you", href: "/for-you" },
   { key: "collections", label: "Collections", href: "/library" },
-  { key: "all", label: "All movies", href: "/" },
+  { key: "all", label: "All", href: "/" },
 ] as const;
 
 export function ForYouHeader() {
