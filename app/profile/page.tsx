@@ -18,7 +18,6 @@ import {
   Gem,
   Ticket,
   Gift,
-  Globe,
   HelpCircle,
   Settings,
   Crown,
@@ -26,7 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { useI18n } from "@/hooks/useI18n";
 import { Button } from "@/components/ui/Button";
 import { NotificationBell } from "@/components/shared/NotificationBell";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -41,6 +40,7 @@ type HistoryItem = {
 
 export default function ProfilePage() {
   const { user, profile, loading } = useAuth();
+  const { t } = useI18n();
   const { wallet } = useWallet(user?.id);
   const router = useRouter();
   const supabase = createClient();
@@ -158,10 +158,10 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex min-h-[70dvh] flex-col items-center justify-center px-6 text-center fade-in">
-        <p className="font-display text-lg text-text">You're browsing as a guest</p>
-        <p className="mt-1 text-sm text-muted">Sign in to save your library and buy coins.</p>
+        <p className="font-display text-lg text-text">{t("profile.guestTitle")}</p>
+        <p className="mt-1 text-sm text-muted">{t("profile.guestBody")}</p>
         <Link href="/auth/login">
-          <Button className="mt-4">Sign in</Button>
+          <Button className="mt-4">{t("profile.signIn")}</Button>
         </Link>
       </div>
     );
@@ -170,16 +170,16 @@ export default function ProfilePage() {
   const creatorLink = () => {
     switch (profile?.creator_status) {
       case "none":
-        return { href: "/creator/apply", label: "Become a creator" };
+        return { href: "/creator/apply", label: t("profile.becomeCreator") };
       case "applied":
-        return { href: "/creator/apply", label: "Application pending" };
+        return { href: "/creator/apply", label: t("profile.applicationPending") };
       case "declined":
-        return { href: "/creator/apply", label: "Application declined — reapply" };
+        return { href: "/creator/apply", label: t("profile.applicationDeclined") };
       case "approved":
       case "partner":
-        return { href: "/creator/dashboard", label: "Creator dashboard" };
+        return { href: "/creator/dashboard", label: t("profile.creatorDashboard") };
       default:
-        return { href: "/creator/apply", label: "Become a creator" };
+        return { href: "/creator/apply", label: t("profile.becomeCreator") };
     }
   };
   const creator = creatorLink();
@@ -230,15 +230,15 @@ export default function ProfilePage() {
           className="mt-5 block rounded-lg border border-gold bg-gradient-to-br from-gold-soft to-surface p-4 transition-transform active:scale-[0.99]"
         >
           <p className="flex items-center gap-1.5 text-[14.5px] font-semibold text-text">
-            <Crown size={16} className="text-gold" /> Enjoy All Exclusive Perks as a VIP
+            <Crown size={16} className="text-gold" /> {t("profile.vipTitle")}
           </p>
           <div className="mt-2.5 flex items-center gap-4 text-[11.5px] text-muted">
-            <span>🔓 2000+ Eps for Free</span>
-            <span>🚫 Ad-free</span>
-            <span>⬇️ Downloads</span>
+            <span>{t("profile.vipFree")}</span>
+            <span>{t("profile.vipAdFree")}</span>
+            <span>{t("profile.vipDownloads")}</span>
           </div>
           <span className="mt-3 flex h-9 items-center justify-center rounded-md bg-gold text-[13.5px] font-semibold text-[rgb(20_16_8)]">
-            Activate →
+            {t("profile.activate")}
           </span>
         </Link>
       )}
@@ -249,7 +249,7 @@ export default function ProfilePage() {
           <span className="font-display text-[16px] font-semibold tabular-nums text-text">
             {wallet ? wallet.coin_balance.toLocaleString() : "—"}
           </span>
-          <span className="text-[11px] text-muted">Wallet</span>
+          <span className="text-[11px] text-muted">{t("profile.wallet")}</span>
         </Link>
         <div className="w-px bg-border" />
         <Link href="/points" className="flex flex-1 flex-col items-center gap-1">
@@ -257,7 +257,7 @@ export default function ProfilePage() {
           <span className="font-display text-[16px] font-semibold tabular-nums text-text">
             {wallet ? wallet.points_balance.toLocaleString() : "—"}
           </span>
-          <span className="text-[11px] text-muted">Points</span>
+          <span className="text-[11px] text-muted">{t("profile.points")}</span>
         </Link>
         <div className="w-px bg-border" />
         <Link href="/tickets" className="flex flex-1 flex-col items-center gap-1">
@@ -265,7 +265,7 @@ export default function ProfilePage() {
           <span className="font-display text-[16px] font-semibold tabular-nums text-text">
             {couponCount}
           </span>
-          <span className="text-[11px] text-muted">Coupons</span>
+          <span className="text-[11px] text-muted">{t("profile.coupons")}</span>
         </Link>
       </div>
 
@@ -288,33 +288,28 @@ export default function ProfilePage() {
         </Link>
       )}
 
-      <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
-        <span className="text-[14px] text-text">Appearance</span>
-        <ThemeToggle />
-      </div>
-
       <nav className="mt-4 divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
         <Link href="/wallet" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Wallet size={17} className="text-muted" /> Top Up
+            <Wallet size={17} className="text-muted" /> {t("profile.topUp")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
         <Link href="/rewards" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Gift size={17} className="text-muted" /> Earn Rewards
+            <Gift size={17} className="text-muted" /> {t("profile.earnRewards")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
         <Link href="/tickets" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Ticket size={17} className="text-muted" /> My Ticket Collection
+            <Ticket size={17} className="text-muted" /> {t("profile.tickets")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
         <Link href="/downloads" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Download size={17} className="text-muted" /> My Download
+            <Download size={17} className="text-muted" /> {t("profile.downloads")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
@@ -331,13 +326,7 @@ export default function ProfilePage() {
       <nav className="mt-4 divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
         <Link href="/settings" className="flex items-center justify-between px-4 py-3.5">
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Settings size={17} className="text-muted" /> Settings
-          </span>
-          <ChevronRight size={16} className="text-muted" />
-        </Link>
-        <Link href="/settings#language" className="flex items-center justify-between px-4 py-3.5">
-          <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <Globe size={17} className="text-muted" /> Language
+            <Settings size={17} className="text-muted" /> {t("profile.settings")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </Link>
@@ -346,7 +335,7 @@ export default function ProfilePage() {
           className="flex items-center justify-between px-4 py-3.5"
         >
           <span className="flex items-center gap-2.5 text-[14px] text-text">
-            <HelpCircle size={17} className="text-muted" /> Help & Feedback
+            <HelpCircle size={17} className="text-muted" /> {t("profile.help")}
           </span>
           <ChevronRight size={16} className="text-muted" />
         </a>
@@ -358,7 +347,7 @@ export default function ProfilePage() {
         size="lg"
         className="mt-5 w-full text-crimson"
       >
-        <LogOut size={16} /> Sign out
+        <LogOut size={16} /> {t("profile.signOut")}
       </Button>
       <div className="h-6" />
     </div>

@@ -11,6 +11,8 @@ import { ChevronRight, Coins, Gem } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
+import { enablePush } from "@/lib/push";
 import { useRewardsState } from "@/hooks/useRewardsState";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -28,6 +30,7 @@ const supabase = createClient();
 export default function RewardsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { t } = useI18n();
   const { state, error, refresh, setError } = useRewardsState();
   const { display: coinsDisplay, changed: coinsChanged } = useAnimatedNumber(state?.balances.coins);
   const { display: rewardDisplay, changed: rewardChanged } = useAnimatedNumber(
@@ -38,6 +41,7 @@ export default function RewardsPage() {
   const [busyTask, setBusyTask] = useState<string | null>(null);
   const [adTaskKey, setAdTaskKey] = useState<string | null>(null);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function requireAuth() {
     router.push(`/auth/login?next=${encodeURIComponent("/rewards")}`);
@@ -65,19 +69,27 @@ export default function RewardsPage() {
     }
     if (task.kind === "notifications" && task.status === "available") {
       setBusyTask(task.key);
+      setNotice(null);
       try {
-        const permission =
-          typeof Notification !== "undefined" ? await Notification.requestPermission() : "denied";
-        await supabase
-          .from("user_settings")
-          .upsert({ user_id: user.id, push_permission: permission }, { onConflict: "user_id" });
-        if (permission === "granted") {
-          await supabase.rpc("claim_reward_task", { p_task_key: task.key });
-        }
+        const permission = await enablePush(supabase, user.id);
+        if (permission === "denied") setError(t("rewards.pushBlocked"));
+        if (permission === "unsupported") setError(t("rewards.pushUnsupported"));
       } finally {
         setBusyTask(null);
         refresh();
       }
+      return;
+    }
+    // Email: the reward is only payable once the address is actually verified,
+    // so an unverified user gets a (re)sent verification link instead of a claim.
+    if (task.kind === "email" && task.status === "available") {
+      setBusyTask(task.key);
+      setNotice(null);
+      const email = user.email ?? "";
+      const { error: resendError } = await supabase.auth.resend({ type: "signup", email });
+      setBusyTask(null);
+      if (resendError) setError(t("rewards.verifyEmailFailed"));
+      else setNotice(t("rewards.verifyEmailSent", { email }));
       return;
     }
     if (task.kind === "social" && task.status === "available") {
@@ -96,8 +108,13 @@ export default function RewardsPage() {
     setBusyTask(task.key);
     const { data } = await supabase.rpc("claim_reward_task", { p_task_key: task.key });
     setBusyTask(null);
-    if (!data?.ok && data?.error === "email_not_verified") {
-      setError("Verify your email first — check your inbox for the confirmation link.");
+    if (!data?.ok) {
+      const messages: Record<string, string> = {
+        email_not_verified: t("rewards.verifyEmailSent", { email: user.email ?? "" }),
+        whatsapp_not_linked: t("rewards.linkWhatsappFirst"),
+        permission_not_granted: t("rewards.enableNotificationsFirst"),
+      };
+      if (data?.error && messages[data.error]) setError(messages[data.error]);
     }
     refresh();
   }
@@ -112,7 +129,7 @@ export default function RewardsPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-semibold text-text">Rewards</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("rewards.title")}</h1>
         <NotificationBell />
       </div>
 
@@ -130,7 +147,7 @@ export default function RewardsPage() {
               {coinsDisplay.toLocaleString()}
             </span>
           )}
-          <span className="text-[12px] text-muted">Coins</span>
+          <span className="text-[12px] text-muted">{t("rewards.coins")}</span>
         </Link>
         <div className="w-px bg-border" />
         <Link href="/wallet" className="flex flex-1 flex-col items-center gap-1">
@@ -146,7 +163,7 @@ export default function RewardsPage() {
               {rewardDisplay.toLocaleString()}
             </span>
           )}
-          <span className="text-[12px] text-muted">Reward Coins</span>
+          <span className="text-[12px] text-muted">{t("rewards.rewardCoins")}</span>
         </Link>
       </div>
 
@@ -156,7 +173,7 @@ export default function RewardsPage() {
       >
         <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
           <Gem size={17} className="text-pink" />
-          Member Points
+          {t("rewards.memberPoints")}
           {!loading && (
             <span className="font-display font-semibold tabular-nums text-pink">
               {state!.balances.points.toLocaleString()}
@@ -169,10 +186,11 @@ export default function RewardsPage() {
       {error && (
         <p className="mt-3 rounded-md bg-crimson-soft px-3 py-2 text-[13px] text-crimson">{error}</p>
       )}
+      {notice && <p className="mt-3 rounded-md bg-surface-raised px-3 py-2 text-[13px] text-text">{notice}</p>}
 
       <section className="mt-6">
         <p className="text-[13px] text-muted">
-          You've maintained streak days:{" "}
+          {t("rewards.streak")}{" "}
           <span className="font-semibold text-text">{loading ? "—" : state!.streak.current}</span>
         </p>
         <div className="mt-3">
@@ -195,22 +213,22 @@ export default function RewardsPage() {
                 disabled={bonusTask.status === "done" || busyTask === bonusTask.key}
                 onClick={() => handleTask(bonusTask)}
               >
-                Get Bonus ({bonusTask.done_count}/{bonusTask.daily_cap})
+                {t("rewards.getBonus")} ({bonusTask.done_count}/{bonusTask.daily_cap})
               </Button>
             ) : null
           ) : (
             <Button className="mt-4 w-full" disabled={checkingIn} onClick={handleCheckIn}>
-              {checkingIn ? "Checking in…" : "Check in"}
+              {checkingIn ? t("rewards.checkingIn") : t("rewards.checkIn")}
             </Button>
           ))}
         {weeklyMax > 0 && (
-          <p className="mt-2 text-center text-[12px] text-muted">Earn up to {weeklyMax} rewards</p>
+          <p className="mt-2 text-center text-[12px] text-muted">{t("rewards.earnUpTo", { n: weeklyMax })}</p>
         )}
       </section>
 
       {!loading && state!.offers.length > 0 && (
         <section className="mt-7">
-          <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Daily Special Offers</h2>
+          <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("rewards.dailyOffers")}</h2>
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
             {state!.offers.map((o) => (
               <DailyOfferCard key={o.id} offer={o} />
@@ -220,7 +238,7 @@ export default function RewardsPage() {
       )}
 
       <section className="mt-7">
-        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Earn Rewards</h2>
+        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("rewards.earn")}</h2>
         <div className="space-y-2">
           {loading ? (
             <>
@@ -246,7 +264,7 @@ export default function RewardsPage() {
         )}
       >
         <Coins size={18} />
-        Visit the Store
+        {t("rewards.visitStore")}
       </Link>
 
       <AdWatchSheet
@@ -263,7 +281,8 @@ export default function RewardsPage() {
         onClose={() => setWhatsAppOpen(false)}
         onLinked={async () => {
           setWhatsAppOpen(false);
-          await supabase.rpc("claim_reward_task", { p_task_key: "link_whatsapp" });
+          const { data } = await supabase.rpc("claim_reward_task", { p_task_key: "link_whatsapp" });
+          if (!data?.ok && data?.error === "whatsapp_not_linked") setError(t("rewards.linkWhatsappFirst"));
           refresh();
         }}
       />

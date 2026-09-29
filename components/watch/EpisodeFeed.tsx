@@ -11,6 +11,7 @@ import { storyboardPublicUrl } from "@/lib/storyboard";
 import { getDeviceId } from "@/lib/device";
 import { useOfflineDownloads } from "@/hooks/useOfflineDownloads";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { Button } from "@/components/ui/Button";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
@@ -72,6 +73,7 @@ export function EpisodeFeed({
   const router = useRouter();
   const goBack = () => (onClose ? onClose() : router.back());
   const { user } = useAuth();
+  const { settings: userSettings } = useUserSettings();
   const supabase = createClient();
   const offline = useOfflineDownloads();
 
@@ -551,7 +553,8 @@ export function EpisodeFeed({
                     onTimeUpdate={(t) => reportProgress(ep, t)}
                     onEnded={() => {
                       reportProgress(ep, ep.duration_seconds ?? lastPlayheadRef.current ?? 0, true);
-                      goToNext(ep);
+                      // "Autoplay next episode" (Settings, on by default). Off = stay on this episode.
+                      if (userSettings.autoplay_next) goToNext(ep);
                     }}
                     topBar={
                       <PlayerTopBar

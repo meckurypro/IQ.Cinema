@@ -5,6 +5,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 import {
   HomeIcon,
   ForYouIcon,
@@ -14,15 +16,16 @@ import {
 } from "./NavIcons";
 
 const items = [
-  { href: "/", label: "Home", icon: HomeIcon },
-  { href: "/for-you", label: "For You", icon: ForYouIcon },
-  { href: "/library", label: "My List", icon: MyListIcon },
-  { href: "/rewards", label: "Rewards", icon: RewardsIcon },
-  { href: "/profile", label: "Profile", icon: ProfileIcon },
-] as const;
+  { href: "/", label: "nav.home", icon: HomeIcon },
+  { href: "/for-you", label: "nav.forYou", icon: ForYouIcon },
+  { href: "/library", label: "nav.myList", icon: MyListIcon },
+  { href: "/rewards", label: "nav.rewards", icon: RewardsIcon },
+  { href: "/profile", label: "nav.profile", icon: ProfileIcon },
+] as const satisfies readonly { href: string; label: MessageKey; icon: unknown }[];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   const hideOn = ["/watch/", "/auth/", "/downloads/play", "/for-you"];
   if (hideOn.some((p) => pathname.startsWith(p))) return null;
 
@@ -58,7 +61,7 @@ export function BottomNav() {
                     active ? "text-pink" : "text-muted"
                   )}
                 >
-                  {label}
+                  {t(label)}
                 </span>
               </Link>
             </li>

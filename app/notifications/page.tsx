@@ -12,6 +12,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
 
 type Notification = {
   id: string;
@@ -28,6 +29,7 @@ const supabase = createClient();
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { t } = useI18n();
   const [items, setItems] = useState<Notification[] | null>(null);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function NotificationsPage() {
         <Link href="/rewards" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Notifications</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("notifications.title")}</h1>
       </div>
 
       {authLoading || !user ? null : items === null ? (
@@ -70,7 +72,7 @@ export default function NotificationsPage() {
       ) : items.length === 0 ? (
         <div className="mt-16 flex flex-col items-center gap-2 text-center">
           <Bell size={28} className="text-muted" />
-          <p className="text-[14px] text-muted">Nothing here yet.</p>
+          <p className="text-[14px] text-muted">{t("notifications.empty")}</p>
         </div>
       ) : (
         <div className="mt-4 space-y-2">
