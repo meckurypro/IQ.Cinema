@@ -11,6 +11,7 @@ import { ArrowLeft, Upload, Check, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { uploadVideoResumable } from "@/lib/supabase/resumableUpload";
+import { hasFastStart } from "@/lib/mp4Faststart";
 import {
   generateStoryboard,
   uploadStoryboard,
@@ -170,6 +171,8 @@ export default function UploadPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoMeta, setVideoMeta] = useState<{ duration: number; width: number; height: number } | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  // Non-blocking: the file will upload, but seeking in it will be slow.
+  const [videoWarning, setVideoWarning] = useState<string | null>(null);
   const [checkingVideo, setCheckingVideo] = useState(false);
   const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(null);
   const [existingStatus, setExistingStatus] = useState<EpisodeRow["status"] | null>(null);
@@ -319,6 +322,7 @@ export default function UploadPage() {
     setVideoFile(file);
     setVideoMeta(null);
     setVideoError(null);
+    setVideoWarning(null);
     if (!file) return;
 
     setCheckingVideo(true);
@@ -327,6 +331,11 @@ export default function UploadPage() {
       setVideoMeta(meta);
       const err = validateVideo(meta, contentType);
       setVideoError(err);
+      if (!err && (await hasFastStart(file)) === false) {
+        setVideoWarning(
+          "This file isn't optimised for streaming, so viewers may see slow starts and long loading when they skip ahead. Re-export it with “fast start” (or run: ffmpeg -i in.mp4 -c copy -movflags +faststart out.mp4) before uploading."
+        );
+      }
     } catch (err: any) {
       setVideoError(err.message ?? "Couldn't read that video file.");
     } finally {
@@ -760,6 +769,7 @@ export default function UploadPage() {
               </p>
             )}
             {videoError && <p className="text-[13px] text-crimson">{videoError}</p>}
+            {!videoError && videoWarning && <p className="text-[13px] text-gold">{videoWarning}</p>}
             {buildingPreview && (
               <p className="text-[12px] text-muted">Building scrub preview…</p>
             )}

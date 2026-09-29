@@ -6,8 +6,8 @@
 // ~4 MB Blob chunks so a big episode is never held in memory in one piece and a
 // half-finished download can resume from the last complete chunk.
 
-// "processing" = fully downloaded, now burning the watermark in before the
-// episode is playable offline (see lib/offline/watermark.ts).
+// "processing" is legacy (old on-device watermark encode, removed); new
+// downloads go straight from "downloading" to "complete".
 export type OfflineStatus = "queued" | "downloading" | "paused" | "processing" | "complete" | "error";
 
 export type OfflineTitle = {
