@@ -7,6 +7,9 @@ import { BottomNav } from "@/components/shared/BottomNav";
 import { AppMain } from "@/components/shared/AppMain";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
+import { UserSettingsProvider } from "@/hooks/useUserSettings";
+import { I18nProvider } from "@/hooks/useI18n";
+import { NotificationListener } from "@/components/shared/NotificationListener";
 
 export const metadata: Metadata = {
   title: "IQ Cinema",
@@ -45,10 +48,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             subscription. See hooks/useAuth.tsx for why that mattered. */}
         <ServiceWorkerRegister />
         <AuthProvider>
-          <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
-            <AppMain>{children}</AppMain>
-            <BottomNav />
-          </div>
+          <UserSettingsProvider>
+            <I18nProvider>
+              <NotificationListener />
+              <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
+                <AppMain>{children}</AppMain>
+                <BottomNav />
+              </div>
+            </I18nProvider>
+          </UserSettingsProvider>
         </AuthProvider>
       </body>
     </html>

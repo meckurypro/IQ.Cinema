@@ -7,65 +7,59 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { useI18n } from "@/hooks/useI18n";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { WhatsAppLinkSheet } from "@/components/rewards/WhatsAppLinkSheet";
+import { enablePush, getPushState, type PushState } from "@/lib/push";
+import type { SettingsPatch } from "@/lib/settings";
 
 const supabase = createClient();
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
-  { code: "sw", label: "Kiswahili" },
-  { code: "ha", label: "Hausa" },
-  { code: "yo", label: "Yorùbá" },
-  { code: "ig", label: "Igbo" },
-];
-
-type Settings = {
-  language: string;
-  autoplay_next: boolean;
-  notify_new_episodes: boolean;
-  notify_rewards: boolean;
-  notify_promos: boolean;
-  whatsapp_number: string | null;
-};
+type Language = { code: string; native_label: string };
 
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const { settings, loaded, error, update, reload } = useUserSettings();
+  const { isOn, loaded: flagsLoaded } = useFeatureFlags();
+  const { t } = useI18n();
+  const [languages, setLanguages] = useState<Language[]>([]);
   const [waOpen, setWaOpen] = useState(false);
+  const [pushState, setPushState] = useState<PushState>("default");
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
     supabase
-      .from("user_settings")
-      .select("language, autoplay_next, notify_new_episodes, notify_rewards, notify_promos, whatsapp_number")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setSettings(
-          data ?? {
-            language: "en",
-            autoplay_next: true,
-            notify_new_episodes: true,
-            notify_rewards: true,
-            notify_promos: false,
-            whatsapp_number: null,
-          }
-        );
-      });
-  }, [user]);
+      .from("app_languages")
+      .select("code, native_label")
+      .eq("enabled", true)
+      .order("sort_order")
+      .then(({ data }) => setLanguages((data as Language[]) ?? []));
+  }, []);
 
-  async function patch(partial: Partial<Settings>) {
-    if (!user || !settings) return;
-    const next = { ...settings, ...partial };
-    setSettings(next);
-    await supabase.from("user_settings").upsert({ user_id: user.id, ...next }, { onConflict: "user_id" });
+  useEffect(() => {
+    setPushState(getPushState());
+  }, [settings.push_permission]);
+
+  async function turnOnPush() {
+    if (!user) return;
+    setPushBusy(true);
+    try {
+      setPushState(await enablePush(supabase, user.id));
+      await reload();
+    } finally {
+      setPushBusy(false);
+    }
   }
 
-  const loading = authLoading || !settings;
+  const loading = authLoading || !loaded || !flagsLoaded;
+  const patch = (p: SettingsPatch) => update(p);
+  const pushOn = pushState === "granted";
 
   return (
     <div className="fade-in px-4 pt-5 pb-10">
@@ -73,8 +67,12 @@ export default function SettingsPage() {
         <Link href="/profile" aria-label="Back" className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Settings</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("settings.title")}</h1>
       </div>
+
+      {error && (
+        <p className="mt-3 rounded-md bg-crimson-soft px-3 py-2 text-[13px] text-crimson">{t("settings.saveError")}</p>
+      )}
 
       {loading ? (
         <div className="mt-5 space-y-2">
@@ -84,64 +82,106 @@ export default function SettingsPage() {
         </div>
       ) : (
         <>
-          <section id="language" className="mt-6 scroll-mt-6">
-            <h2 className="font-display mb-2 text-[14px] font-semibold text-text">Language</h2>
-            <div className="overflow-hidden rounded-md border border-border bg-surface">
-              {LANGUAGES.map((l) => (
-                <button
-                  key={l.code}
-                  onClick={() => patch({ language: l.code })}
-                  className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-[14px] text-text last:border-0"
-                >
-                  {l.label}
-                  {settings.language === l.code && <span className="text-pink">✓</span>}
-                </button>
-              ))}
-            </div>
-          </section>
+          {isOn("settings_appearance") && (
+            <section className="mt-6">
+              <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("settings.appearance")}</h2>
+              <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+                <span className="text-[14px] text-text">{t("settings.appearance")}</span>
+                <ThemeToggle />
+              </div>
+            </section>
+          )}
 
-          <section className="mt-6">
-            <h2 className="font-display mb-2 text-[14px] font-semibold text-text">Playback</h2>
-            <Toggle
-              label="Autoplay next episode"
-              checked={settings.autoplay_next}
-              onChange={(v) => patch({ autoplay_next: v })}
-            />
-          </section>
+          {isOn("settings_language") && languages.length > 0 && (
+            <section id="language" className="mt-6 scroll-mt-6">
+              <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("settings.language")}</h2>
+              <div className="overflow-hidden rounded-md border border-border bg-surface">
+                {languages.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => patch({ language: l.code })}
+                    className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-[14px] text-text last:border-0"
+                  >
+                    {l.native_label}
+                    {settings.language === l.code && <span className="text-pink">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
-          <section className="mt-6">
-            <h2 className="font-display mb-2 text-[14px] font-semibold text-text">Notifications</h2>
-            <div className="space-y-2">
+          {isOn("settings_playback") && (
+            <section className="mt-6">
+              <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("settings.playback")}</h2>
               <Toggle
-                label="New episodes"
-                checked={settings.notify_new_episodes}
-                onChange={(v) => patch({ notify_new_episodes: v })}
+                label={t("settings.autoplay")}
+                checked={settings.autoplay_next}
+                onChange={(v) => patch({ autoplay_next: v })}
               />
-              <Toggle
-                label="Rewards & offers"
-                checked={settings.notify_rewards}
-                onChange={(v) => patch({ notify_rewards: v })}
-              />
-              <Toggle
-                label="Promotions"
-                checked={settings.notify_promos}
-                onChange={(v) => patch({ notify_promos: v })}
-              />
-            </div>
-          </section>
+            </section>
+          )}
 
-          <section className="mt-6">
-            <h2 className="font-display mb-2 text-[14px] font-semibold text-text">WhatsApp</h2>
-            <button
-              onClick={() => setWaOpen(true)}
-              className="flex w-full items-center justify-between rounded-md border border-border bg-surface px-4 py-3 text-left text-[14px] text-text"
-            >
-              {settings.whatsapp_number ?? "Not linked"}
-              <span className="text-[12.5px] font-semibold text-pink">
-                {settings.whatsapp_number ? "Change" : "Link"}
-              </span>
-            </button>
-          </section>
+          {isOn("settings_notifications") && (
+            <section className="mt-6">
+              <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("settings.notifications")}</h2>
+              <div className="space-y-2">
+                <div className="rounded-md border border-border bg-surface px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] text-text">{t("settings.push")}</span>
+                    {pushOn ? (
+                      <span className="text-[12.5px] font-semibold text-pink">{t("settings.pushOn")}</span>
+                    ) : pushState === "default" ? (
+                      <button
+                        onClick={turnOnPush}
+                        disabled={pushBusy}
+                        className="text-[12.5px] font-semibold text-pink disabled:opacity-60"
+                      >
+                        {t("settings.pushTurnOn")}
+                      </button>
+                    ) : (
+                      <span className="text-[12.5px] text-muted">{t("settings.pushOff")}</span>
+                    )}
+                  </div>
+                  {pushState === "denied" && (
+                    <p className="mt-1.5 text-[12px] text-muted">{t("settings.pushBlocked")}</p>
+                  )}
+                  {pushState === "unsupported" && (
+                    <p className="mt-1.5 text-[12px] text-muted">{t("settings.pushUnsupported")}</p>
+                  )}
+                </div>
+                <Toggle
+                  label={t("settings.newEpisodes")}
+                  checked={settings.notify_new_episodes}
+                  onChange={(v) => patch({ notify_new_episodes: v })}
+                />
+                <Toggle
+                  label={t("settings.rewards")}
+                  checked={settings.notify_rewards}
+                  onChange={(v) => patch({ notify_rewards: v })}
+                />
+                <Toggle
+                  label={t("settings.promos")}
+                  checked={settings.notify_promos}
+                  onChange={(v) => patch({ notify_promos: v })}
+                />
+              </div>
+            </section>
+          )}
+
+          {isOn("settings_whatsapp") && (
+            <section className="mt-6">
+              <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("settings.whatsapp")}</h2>
+              <button
+                onClick={() => setWaOpen(true)}
+                className="flex w-full items-center justify-between rounded-md border border-border bg-surface px-4 py-3 text-left text-[14px] text-text"
+              >
+                {settings.whatsapp_number ?? t("settings.notLinked")}
+                <span className="text-[12.5px] font-semibold text-pink">
+                  {settings.whatsapp_number ? t("settings.change") : t("settings.link")}
+                </span>
+              </button>
+            </section>
+          )}
         </>
       )}
 
@@ -150,18 +190,16 @@ export default function SettingsPage() {
         onClose={() => setWaOpen(false)}
         onLinked={() => {
           setWaOpen(false);
-          supabase
-            .from("user_settings")
-            .select("whatsapp_number")
-            .eq("user_id", user!.id)
-            .maybeSingle()
-            .then(({ data }) => data && patch({ whatsapp_number: data.whatsapp_number }));
+          reload();
         }}
       />
     </div>
   );
 }
 
+// The knob is positioned by flex + padding (not `absolute` with no left/right
+// anchor), so it can't drift outside the track. Travel = track (44) - knob (20)
+// - padding (2 × 2) = 20px = translate-x-5.
 function Toggle({
   label,
   checked,
@@ -172,20 +210,26 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
-      <span className="text-[14px] text-text">{label}</span>
+    <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+      <span className="pr-3 text-[14px] text-text">{label}</span>
       <button
+        type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? "bg-pink" : "bg-border"}`}
+        className={clsx(
+          "flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors",
+          checked ? "bg-pink" : "bg-border"
+        )}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0.5"
-          }`}
+          className={clsx(
+            "h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+            checked ? "translate-x-5" : "translate-x-0"
+          )}
         />
       </button>
-    </label>
+    </div>
   );
 }

@@ -98,3 +98,22 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// Clicking a system notification opens (or focuses) the app at its target page.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const href = (event.notification.data && event.notification.data.href) || "/notifications";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of all) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client) await client.navigate(href).catch(() => {});
+          return;
+        }
+      }
+      await self.clients.openWindow(href);
+    })()
+  );
+});

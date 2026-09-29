@@ -386,7 +386,7 @@ export default function AdminPage() {
     { key: "partners", label: "Partner apps", count: partnerApps.length },
     { key: "withdrawals", label: "Withdrawals", count: withdrawals.length },
     { key: "reports", label: "Reports", count: reports.length },
-    { key: "links", label: "Links" },
+    { key: "links", label: "Features" },
     { key: "users", label: "Users" },
     { key: "settings", label: "Settings" },
   ];
@@ -413,6 +413,12 @@ export default function AdminPage() {
           className="shrink-0 border-b-2 border-transparent pb-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
           Rewards & Store ↗
+        </Link>
+        <Link
+          href="/admin/promos"
+          className="shrink-0 border-b-2 border-transparent pb-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text"
+        >
+          Promotions ↗
         </Link>
       </div>
 
@@ -620,7 +626,7 @@ export default function AdminPage() {
       {tab === "links" && (
         <div className="mt-4 space-y-3">
           <p className="text-[12px] text-muted">
-            Turn a link off to hide it from every user's profile page — no code changes needed.
+            Turn a feature off to hide it for every user (profile links and Settings sections) — no code changes needed.
           </p>
           <ul className="space-y-3">
             {flags.map((f) => (
@@ -655,7 +661,7 @@ export default function AdminPage() {
               </li>
             ))}
             {!flags.length && (
-              <p className="mt-6 text-center text-sm text-muted">No links configured yet.</p>
+              <p className="mt-6 text-center text-sm text-muted">No features configured yet.</p>
             )}
           </ul>
         </div>
