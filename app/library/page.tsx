@@ -4,24 +4,21 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyList } from "@/hooks/useMyList";
 import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
 import { groupByDay, type ListKind } from "@/lib/myList";
 import { PullToRefresh } from "@/components/shared/PullToRefresh";
-import { BottomSheet } from "@/components/shared/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { LibraryTabs, type TopTab } from "@/components/library/LibraryTabs";
-import { EditToggle } from "@/components/library/EditToggle";
 import { SegmentedControl } from "@/components/library/SegmentedControl";
 import { SubscribeBanner } from "@/components/library/SubscribeBanner";
 import { PosterCard } from "@/components/library/PosterCard";
 import { HistoryRow } from "@/components/library/HistoryRow";
 import { EmptyState } from "@/components/library/EmptyState";
-import { EditBar } from "@/components/library/EditBar";
 
 type ReminderTab = "released" | "upcoming";
 
@@ -38,9 +35,6 @@ export default function LibraryPage() {
   const [top, setTop] = useState<TopTab>("following");
   const [category, setCategory] = useState<Category>(DEFAULT_CATEGORY);
   const [reminderTab, setReminderTab] = useState<ReminderTab>("released");
-  const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const kind: ListKind =
     top === "reminders"
@@ -55,55 +49,7 @@ export default function LibraryPage() {
     top === "reminders" ? null : category
   );
 
-  // Changing view always leaves edit mode; a selection only makes sense
-  // against the list it was made on.
-  useEffect(() => {
-    setEditing(false);
-    setSelected(new Set());
-  }, [kind, category]);
-
   const groups = useMemo(() => (top === "history" && items ? groupByDay(items) : []), [top, items]);
-  const total = items?.length ?? 0;
-
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    if (!items) return;
-    setSelected((prev) =>
-      prev.size === items.length ? new Set() : new Set(items.map((i) => i.title_id))
-    );
-  }
-
-  function toggleEdit() {
-    setEditing((v) => !v);
-    setSelected(new Set());
-  }
-
-  async function removeSelected() {
-    const ids = Array.from(selected);
-    setConfirmOpen(false);
-    if (!ids.length) return;
-
-    const run =
-      top === "following"
-        ? () => supabase.rpc("set_titles_follow", { p_title_ids: ids, p_follow: false })
-        : top === "history"
-          ? () => supabase.rpc("remove_from_history", { p_title_ids: ids })
-          : () => supabase.rpc("set_title_reminders", { p_title_ids: ids, p_on: false });
-
-    const ok = await mutate((rows) => rows.filter((r) => !ids.includes(r.title_id)), run);
-    if (ok) {
-      setSelected(new Set());
-      setEditing(false);
-    }
-  }
 
   function toggleFollow(titleId: string, next: boolean) {
     return mutate(
@@ -112,14 +58,6 @@ export default function LibraryPage() {
     );
   }
 
-  const actionLabel = top === "following" ? "Unfollow" : top === "history" ? "Delete" : "Remove";
-  const confirmCopy =
-    top === "following"
-      ? { title: "Unfollow", body: "They'll leave Following and your saved episodes for them will be cleared." }
-      : top === "history"
-        ? { title: "Delete from history", body: "Your watch progress for them will be cleared." }
-        : { title: "Remove reminders", body: "You won't be notified when they release." };
-
   const showSkeleton = (authLoading || (user && items === null)) && !error;
 
   return (
@@ -127,25 +65,22 @@ export default function LibraryPage() {
       <div className="fade-in px-4 pt-3">
         <LibraryTabs value={top} onChange={setTop} />
 
-        <div className="mt-1 flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            {top === "reminders" ? (
-              <SegmentedControl
-                ariaLabel="Reminder status"
-                options={REMINDER_OPTIONS}
-                value={reminderTab}
-                onChange={setReminderTab}
-              />
-            ) : (
-              <SegmentedControl
-                ariaLabel="Category"
-                options={CATEGORIES}
-                value={category}
-                onChange={setCategory}
-              />
-            )}
-          </div>
-          <EditToggle editing={editing} disabled={!total} onToggle={toggleEdit} />
+        <div className="mt-1">
+          {top === "reminders" ? (
+            <SegmentedControl
+              ariaLabel="Reminder status"
+              options={REMINDER_OPTIONS}
+              value={reminderTab}
+              onChange={setReminderTab}
+            />
+          ) : (
+            <SegmentedControl
+              ariaLabel="Category"
+              options={CATEGORIES}
+              value={category}
+              onChange={setCategory}
+            />
+          )}
         </div>
 
         {top === "following" && user && (
@@ -189,7 +124,6 @@ export default function LibraryPage() {
           <div
             key={`${kind}-${category}`}
             className="fade-in mt-5"
-            style={{ paddingBottom: editing ? "4.5rem" : 0 }}
           >
             {top === "history" ? (
               <div className="space-y-6">
@@ -201,9 +135,6 @@ export default function LibraryPage() {
                         <HistoryRow
                           key={item.title_id}
                           item={item}
-                          editing={editing}
-                          selected={selected.has(item.title_id)}
-                          onToggleSelect={() => toggleSelect(item.title_id)}
                           onToggleFollow={() => toggleFollow(item.title_id, !item.is_following)}
                         />
                       ))}
@@ -217,9 +148,6 @@ export default function LibraryPage() {
                   <PosterCard
                     key={item.title_id}
                     item={item}
-                    editing={editing}
-                    selected={selected.has(item.title_id)}
-                    onToggleSelect={() => toggleSelect(item.title_id)}
                     upcoming={kind === "reminders_upcoming"}
                   />
                 ))}
@@ -237,31 +165,6 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {editing && (
-        <EditBar
-          selectedCount={selected.size}
-          total={total}
-          actionLabel={actionLabel}
-          onToggleAll={toggleAll}
-          onAction={() => setConfirmOpen(true)}
-        />
-      )}
-
-      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title={confirmCopy.title}>
-        <div className="px-5 pb-5">
-          <p className="text-[14px] leading-relaxed text-muted">
-            {selected.size === 1 ? "1 title" : `${selected.size} titles`}. {confirmCopy.body}
-          </p>
-          <div className="mt-5 flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" className="flex-1" onClick={removeSelected}>
-              {actionLabel}
-            </Button>
-          </div>
-        </div>
-      </BottomSheet>
     </PullToRefresh>
   );
 }
