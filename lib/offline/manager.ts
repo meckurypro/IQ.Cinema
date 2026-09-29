@@ -124,10 +124,15 @@ class OfflineManager {
     }
     try {
       const [titles, episodes] = await Promise.all([getAllTitles(effective), getAllEpisodes(effective)]);
-      // Anything that was mid-flight when the tab died is resumable, not lost.
-      const settled = episodes.map((e) =>
-        e.status === "downloading" || e.status === "queued" ? { ...e, status: "paused" as const } : e
-      );
+      // Anything that was mid-flight when the tab died is resumable, not
+      // lost. Legacy "processing" rows (from the old on-device watermark
+      // encode, since removed) already hold a complete, playable download,
+      // so they simply become "complete".
+      const settled = episodes.map((e) => {
+        if (e.status === "downloading" || e.status === "queued") return { ...e, status: "paused" as const };
+        if (e.status === "processing") return { ...e, status: "complete" as const, processProgress: undefined };
+        return e;
+      });
       this.set({ ready: true, userId: effective, titles, episodes: settled });
       if (navigator.onLine) this.pump();
     } catch {
@@ -340,16 +345,7 @@ class OfflineManager {
 
       if (total > 0 && received < total) throw new Error("Connection dropped");
 
-      const finished: OfflineEpisode = {
-        ...ep,
-        totalBytes: total || received,
-        receivedBytes: received,
-        status: "complete",
-        error: null,
-        completedAt: Date.now(),
-      };
-      await putEpisode(finished);
-      this.patch(episodeId, finished, true);
+      await this.finalize(episodeId, { ...ep, totalBytes: total || received, receivedBytes: received });
     } catch (err) {
       const reason = controller.signal.reason;
       if (controller.signal.aborted && (reason === "remove" || reason === "pause")) {
@@ -372,6 +368,23 @@ class OfflineManager {
       this.controllers.delete(episodeId);
       this.pump();
     }
+  }
+
+  // The video is fully downloaded, so it is immediately playable offline.
+  // We deliberately do NOT re-encode it on the device: a single-threaded
+  // WASM encode of a whole episode on a phone takes many minutes, blocks the
+  // main thread and used to leave downloads stuck on "Finishing up…". The
+  // app-icon watermark is drawn by the player as a CSS overlay instead.
+  private async finalize(episodeId: string, downloaded: OfflineEpisode) {
+    const finished: OfflineEpisode = {
+      ...downloaded,
+      status: "complete",
+      error: null,
+      completedAt: Date.now(),
+      processProgress: undefined,
+    };
+    await putEpisode(finished);
+    this.patch(episodeId, finished, true);
   }
 
   // In-flight (unflushed) bytes are lost on failure; the resumable point is

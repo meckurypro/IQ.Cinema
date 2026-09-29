@@ -6,7 +6,9 @@
 // ~4 MB Blob chunks so a big episode is never held in memory in one piece and a
 // half-finished download can resume from the last complete chunk.
 
-export type OfflineStatus = "queued" | "downloading" | "paused" | "complete" | "error";
+// "processing" is legacy (old on-device watermark encode, removed); new
+// downloads go straight from "downloading" to "complete".
+export type OfflineStatus = "queued" | "downloading" | "paused" | "processing" | "complete" | "error";
 
 export type OfflineTitle = {
   titleId: string;
@@ -35,6 +37,10 @@ export type OfflineEpisode = {
   error: string | null;
   addedAt: number;
   completedAt: number | null;
+  // Transient — 0..1 progress of the post-download watermark encode. Never
+  // persisted (not meaningful across a page reload); only set in memory
+  // while status is "processing".
+  processProgress?: number;
 };
 
 type ChunkRow = { key: string; episodeId: string; index: number; data: Blob };
@@ -137,6 +143,54 @@ async function deleteChunks(db: IDBDatabase, episodeId: string) {
 export async function clearEpisodeChunks(episodeId: string) {
   const db = await openDb();
   await deleteChunks(db, episodeId);
+}
+
+// --- staging area for the watermark re-encode -------------------------------
+//
+// The watermarked replacement is written under a synthetic id (never a real
+// episodeId, so it can't collide with `deleteChunks`/`readEpisodeBlob` for
+// the real episode) until every chunk is confirmed on disk. Only then do we
+// drop the original and promote the stage — so a crash or quota error
+// mid-encode leaves the original playable copy untouched instead of a
+// hybrid of old and new bytes under the same keys.
+function stagingId(episodeId: string) {
+  return `${episodeId}#staging`;
+}
+
+export async function putStagingChunk(episodeId: string, index: number, data: Blob) {
+  const db = await openDb();
+  const stage = stagingId(episodeId);
+  const tx = db.transaction("chunks", "readwrite");
+  const row: ChunkRow = { key: `${stage}:${index}`, episodeId: stage, index, data };
+  tx.objectStore("chunks").put(row);
+  await done(tx);
+}
+
+export async function clearStagingChunks(episodeId: string) {
+  const db = await openDb();
+  await deleteChunks(db, stagingId(episodeId));
+}
+
+// Drops the original chunks, then copies every staged chunk into the real
+// episode's chunk keys and clears the stage. Assumes the caller already
+// confirmed all `count` staged chunks were written successfully.
+export async function promoteStagingChunks(episodeId: string, count: number) {
+  const db = await openDb();
+  const stage = stagingId(episodeId);
+  await deleteChunks(db, episodeId);
+  const readTx = db.transaction("chunks");
+  const store = readTx.objectStore("chunks");
+  const rows = await Promise.all(
+    Array.from({ length: count }, (_, i) => wrap<ChunkRow | undefined>(store.get(`${stage}:${i}`)))
+  );
+  const writeTx = db.transaction("chunks", "readwrite");
+  for (let i = 0; i < count; i++) {
+    const row = rows[i];
+    if (!row) throw new Error(`Missing staged chunk ${i}`);
+    writeTx.objectStore("chunks").put({ key: `${episodeId}:${i}`, episodeId, index: i, data: row.data });
+  }
+  await done(writeTx);
+  await deleteChunks(db, stage);
 }
 
 export async function deleteEpisode(episodeId: string) {

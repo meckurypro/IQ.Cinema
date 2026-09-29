@@ -60,8 +60,17 @@ type Engagement = {
   shareCount: number;
 };
 
-export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) {
+export function EpisodeFeed({
+  initialEpisodeId,
+  onClose,
+}: {
+  initialEpisodeId: string;
+  // When the feed is embedded (For You's "Watch Full Movie"), Back closes the
+  // embed instead of navigating.
+  onClose?: () => void;
+}) {
   const router = useRouter();
+  const goBack = () => (onClose ? onClose() : router.back());
   const { user } = useAuth();
   const supabase = createClient();
   const offline = useOfflineDownloads();
@@ -547,7 +556,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
                     topBar={
                       <PlayerTopBar
                         episodeNumber={ep.episode_number}
-                        onBack={() => router.back()}
+                        onBack={goBack}
                         onOpenTitle={openDetails}
                         speed={speed}
                         onOpenSpeed={() => setShowSpeed(true)}
@@ -580,7 +589,7 @@ export function EpisodeFeed({ initialEpisodeId }: { initialEpisodeId: string }) 
                 <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
                   <PlayerTopBar
                     episodeNumber={ep.episode_number}
-                    onBack={() => router.back()}
+                    onBack={goBack}
                     speed={speed}
                     onOpenSpeed={() => setShowSpeed(true)}
                     onOpenMore={() => setShowMore(true)}

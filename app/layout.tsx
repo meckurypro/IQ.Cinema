@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ThemeScript } from "@/components/shared/ThemeScript";
 import { BottomNav } from "@/components/shared/BottomNav";
+import { AppMain } from "@/components/shared/AppMain";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
 
@@ -45,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorkerRegister />
         <AuthProvider>
           <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
-            <main className="flex-1 pb-20">{children}</main>
+            <AppMain>{children}</AppMain>
             <BottomNav />
           </div>
         </AuthProvider>

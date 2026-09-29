@@ -59,6 +59,7 @@ type EpisodeRow = {
   name: string | null;
   status: "draft" | "processing" | "published" | "suspended";
   video_url: string | null;
+  is_promo: boolean;
 };
 
 const UNIT_LABEL: Record<string, string> = {
@@ -101,7 +102,7 @@ export default function ManageTitlePage() {
         .single(),
       supabase
         .from("episodes")
-        .select("id, episode_number, name, status, video_url")
+        .select("id, episode_number, name, status, video_url, is_promo")
         .eq("title_id", id)
         .order("episode_number", { ascending: true }),
     ]);
@@ -202,6 +203,21 @@ export default function ManageTitlePage() {
     load();
   }
 
+  async function setPromo(episodeId: string) {
+    setActionBusy(`promo-${episodeId}`);
+    setError(null);
+    const { data, error: rpcErr } = await supabase.rpc("set_promo_episode", {
+      p_title_id: id,
+      p_episode_id: episodeId,
+    });
+    setActionBusy(null);
+    if (rpcErr || !data?.ok) {
+      setError(rpcErr?.message || data?.error || "Could not set promo episode.");
+      return;
+    }
+    load();
+  }
+
   if (loading) {
     return (
       <div className="fade-in px-4 pt-5 pb-10">
@@ -220,6 +236,8 @@ export default function ManageTitlePage() {
   }
 
   const unitLabel = UNIT_LABEL[title.content_type] ?? "Episode";
+  const numberedEpisodes = episodes.filter((e) => e.episode_number > 0);
+  const promoClip = episodes.find((e) => e.episode_number === 0) ?? null;
   // Only an episode that's been finalized (sent into the transcode
   // pipeline or already published) counts — a video_url can exist on a
   // still-draft episode mid-edit, which used to let a project get
@@ -363,7 +381,7 @@ export default function ManageTitlePage() {
       </div>
 
       <ul className="mt-2.5 divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
-        {episodes.map((ep) => (
+        {numberedEpisodes.map((ep) => (
           <li key={ep.id}>
             <Link
               href={`/creator/upload?titleId=${title.id}&episodeId=${ep.id}`}
@@ -380,12 +398,83 @@ export default function ManageTitlePage() {
             </Link>
           </li>
         ))}
-        {!episodes.length && (
+        {!numberedEpisodes.length && (
           <li className="px-4 py-6 text-center text-sm text-muted">
             No {unitLabel.toLowerCase()}s yet.
           </li>
         )}
       </ul>
+
+      {/* Promo episode: what shows on the For You feed. Either an existing
+          published episode flagged as the promo, or a dedicated clip
+          uploaded outside the 1..N numbering — same underlying table, no
+          separate structure. */}
+      <div className="mt-7 flex items-center justify-between">
+        <h2 className="font-display text-[17px] font-semibold text-text">Promo episode</h2>
+      </div>
+      <p className="mt-1 text-[12px] text-muted">
+        Shown on the For You feed with this title's tags and category. Pick a published{" "}
+        {unitLabel.toLowerCase()}, or use a dedicated clip that isn't one of the numbered ones.
+      </p>
+
+      <ul className="mt-2.5 divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
+        {promoClip && (
+          <li className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-[14px] font-medium text-text">
+                Dedicated promo clip{promoClip.name ? ` · ${promoClip.name}` : ""}
+              </p>
+              <p className="mt-0.5 text-[12px] capitalize text-muted">
+                {promoClip.status}
+                {promoClip.is_promo ? " · Currently the promo" : ""}
+              </p>
+            </div>
+            <Link href={`/creator/upload?titleId=${title.id}&promo=1`} className="text-[12px] text-pink">
+              Edit
+            </Link>
+          </li>
+        )}
+        {numberedEpisodes.map((ep) => (
+          <li key={ep.id} className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-[14px] font-medium text-text">
+                {unitLabel} {ep.episode_number}
+                {ep.name ? ` · ${ep.name}` : ""}
+              </p>
+              {ep.is_promo && (
+                <p className="mt-0.5 text-[12px] font-semibold text-pink">Currently the promo episode</p>
+              )}
+            </div>
+            {ep.is_promo ? (
+              <span className="text-[12px] text-muted">Promo</span>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={actionBusy !== null || ep.status !== "published"}
+                onClick={() => setPromo(ep.id)}
+                title={ep.status !== "published" ? "Publish this episode first" : undefined}
+              >
+                {actionBusy === `promo-${ep.id}` ? "Setting…" : "Set as promo"}
+              </Button>
+            )}
+          </li>
+        ))}
+        {!numberedEpisodes.length && !promoClip && (
+          <li className="px-4 py-6 text-center text-sm text-muted">
+            No {unitLabel.toLowerCase()}s yet — publish one, or upload a dedicated promo clip.
+          </li>
+        )}
+      </ul>
+
+      {!promoClip && (
+        <Link
+          href={`/creator/upload?titleId=${title.id}&promo=1`}
+          className="mt-2 inline-block text-[12px] font-medium text-pink underline underline-offset-2"
+        >
+          Or upload a dedicated promo clip instead
+        </Link>
+      )}
     </div>
   );
 }
