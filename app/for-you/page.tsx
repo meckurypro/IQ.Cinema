@@ -12,7 +12,7 @@ import { ForYouFeed } from "@/components/foryou/ForYouFeed";
 // else — no separate shell to keep in sync with it.
 export default function ForYouPage() {
   return (
-    <Suspense fallback={<div className="h-[calc(100dvh-5rem)] bg-black" />}>
+    <Suspense fallback={<div className="h-dvh bg-black" />}>
       <ForYouFeed />
     </Suspense>
   );
