@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 
 export type Wallet = {
   coin_balance: number;
+  reward_coin_balance: number;
+  points_balance: number;
   earnings_balance_naira: number;
   escrow_balance_naira: number;
 };
