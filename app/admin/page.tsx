@@ -5,6 +5,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -247,6 +248,26 @@ export default function AdminPage() {
     setUserActionId(null);
   }
 
+  const [grantAmount, setGrantAmount] = useState("");
+  const [grantCurrency, setGrantCurrency] = useState<"coins" | "reward_coins" | "points">("reward_coins");
+  const [grantMessage, setGrantMessage] = useState<string | null>(null);
+
+  async function grantCurrencyTo(u: SearchedProfile) {
+    const amount = Number(grantAmount);
+    if (!amount || amount <= 0) return;
+    setUserActionId(u.id);
+    setGrantMessage(null);
+    const { data, error } = await supabase.rpc("admin_grant_currency", {
+      p_user_id: u.id,
+      p_currency: grantCurrency,
+      p_amount: amount,
+      p_note: "admin panel grant",
+    });
+    setUserActionId(null);
+    setGrantMessage(!error && data?.ok ? "Granted." : data?.error ?? "Failed to grant.");
+    if (!error && data?.ok) setGrantAmount("");
+  }
+
   // Mirrors the middleware's server-side redirect for the moment the client
   // takes over — the middleware is what actually enforces this, this is just
   // belt-and-suspenders so a stale client render never flashes admin data.
@@ -387,6 +408,12 @@ export default function AdminPage() {
             {t.label} {t.count ? `(${t.count})` : ""}
           </button>
         ))}
+        <Link
+          href="/admin/rewards"
+          className="shrink-0 border-b-2 border-transparent pb-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text"
+        >
+          Rewards & Store ↗
+        </Link>
       </div>
 
       {tab === "projects" && (
@@ -732,6 +759,38 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
+
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Grant currency
+                </p>
+                <div className="mt-1.5 flex gap-1.5">
+                  <select
+                    value={grantCurrency}
+                    onChange={(e) => setGrantCurrency(e.target.value as typeof grantCurrency)}
+                    className="h-10 rounded-md border border-border bg-surface px-2 text-[13px] text-text"
+                  >
+                    <option value="coins">Coins</option>
+                    <option value="reward_coins">Reward coins</option>
+                    <option value="points">Points</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Amount"
+                    value={grantAmount}
+                    onChange={(e) => setGrantAmount(e.target.value)}
+                    className="h-10 w-24 rounded-md border border-border bg-surface px-2 text-[13px] text-text"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={userActionId === u.id || !grantAmount}
+                    onClick={() => grantCurrencyTo(u)}
+                  >
+                    Grant
+                  </Button>
+                </div>
+                {grantMessage && <p className="mt-1 text-[11.5px] text-muted">{grantMessage}</p>}
               </li>
             ))}
             {!userResults.length && !userSearchLoading && userQuery.trim() && (
@@ -755,6 +814,9 @@ export default function AdminPage() {
             ["strikes_before_suspension", "Strikes before suspension"],
             ["strike_suspension_months", "Suspension length (months)"],
             ["strike_expiry_months", "Strike expiry (months)"],
+            ["reward_coin_creator_share", "Creator share of reward-coin spend (0–1)"],
+            ["points_box_min", "Daily points box — min"],
+            ["points_box_max", "Daily points box — max"],
           ].map(([key, label]) => (
             <div key={key}>
               <label className="text-[12px] text-muted">{label}</label>
@@ -774,6 +836,14 @@ export default function AdminPage() {
               onChange={(e) => setSettings({ ...settings, ads_enabled: e.target.checked })}
             />
             <span className="text-[13px] text-text">Ads enabled</span>
+          </label>
+          <label className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              checked={!!settings.points_box_vip_only}
+              onChange={(e) => setSettings({ ...settings, points_box_vip_only: e.target.checked })}
+            />
+            <span className="text-[13px] text-text">Daily points box is VIP-only</span>
           </label>
           <Button type="submit" className="w-full">
             Save settings
