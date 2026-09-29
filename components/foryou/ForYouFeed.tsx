@@ -5,7 +5,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import { Play, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
@@ -16,6 +15,7 @@ import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
 import { CommentsSheet } from "@/components/watch/CommentsSheet";
 import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
+import { EpisodeFeed } from "@/components/watch/EpisodeFeed";
 import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
 import { ForYouHeader } from "@/components/foryou/ForYouHeader";
 
@@ -66,7 +66,6 @@ export function ForYouFeed() {
   const [engagement, setEngagement] = useState<Record<string, Engagement>>({});
   const [exhausted, setExhausted] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showComments, setShowComments] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showTray, setShowTray] = useState(false);
@@ -76,6 +75,10 @@ export function ForYouFeed() {
   const [trayDefaultCost, setTrayDefaultCost] = useState(30);
   const [trayUnlockedIds, setTrayUnlockedIds] = useState<Set<string>>(new Set());
   const [shareToast, setShareToast] = useState(false);
+  // "Watch Full Movie" plays the title's episodes in a full-screen layer on
+  // top of the feed — the route never changes, so closing lands back on the
+  // same promo.
+  const [fullEpisodeId, setFullEpisodeId] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -355,20 +358,49 @@ export function ForYouFeed() {
     }
   }
 
+  // Back button closes the full-movie layer instead of leaving For You.
+  useEffect(() => {
+    if (!fullEpisodeId) return;
+    const marker = `full-${Date.now()}`;
+    window.history.pushState({ ...(window.history.state ?? {}), __full: marker }, "", window.location.href);
+    const onPop = () => {
+      if (window.history.state?.__full !== marker) setFullEpisodeId(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // Closed by the on-screen back button (not the system Back): drop our entry.
+      if (window.history.state?.__full === marker) window.history.back();
+    };
+  }, [fullEpisodeId]);
+
+  async function openFullMovie(item: PromoItem) {
+    const { data } = await supabase
+      .from("episodes")
+      .select("id")
+      .eq("title_id", item.title_id)
+      .eq("status", "published")
+      .gt("episode_number", 0)
+      .order("episode_number", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) setFullEpisodeId(data.id);
+  }
+
   if (!items) {
-    return <div className="h-[calc(100dvh-5rem)] bg-black" />;
+    return <div className="h-dvh bg-black" />;
   }
 
   const active = items.find((i) => i.episode_id === activeId) ?? items[0];
 
   return (
-    <div className="relative h-[calc(100dvh-5rem)] w-full overflow-hidden bg-black">
+    <div className="relative h-dvh w-full overflow-hidden bg-black">
       <ForYouHeader />
       <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
         {items.map((item) => {
-          const isActive = item.episode_id === activeId;
+          // The promo unmounts while the full movie is up, so only one video plays.
+          const isActive = item.episode_id === activeId && !fullEpisodeId;
           const eng = engagement[item.episode_id];
-          const isExpanded = expanded.has(item.episode_id);
           const epLabel = item.total_episodes > 0 ? `EP.${Math.max(item.episode_number, 1)}/EP.${item.total_episodes}` : null;
 
           return (
@@ -386,6 +418,7 @@ export function ForYouFeed() {
                   src={videoUrls[item.episode_id]}
                   autoPlay
                   posterUrl={item.thumbnail_url ?? item.poster_url ?? undefined}
+                  hideWatermark
                   onRequestFreshSrc={() => refreshVideoUrl(item.episode_id)}
                   storyboardUrl={item.video_url ? storyboardPublicUrl(supabase, item.video_url) : null}
                   onTimeUpdate={(t) => reportProgress(item, t)}
@@ -393,6 +426,60 @@ export function ForYouFeed() {
                     reportProgress(item, item.duration_seconds ?? lastPlayheadRef.current ?? 0, true);
                     goToNext(item);
                   }}
+                  bottomContent={
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        data-tap
+                        onClick={() => setShowDetails(true)}
+                        className="flex max-w-[78%] items-center gap-1 text-left"
+                      >
+                        <span className="truncate font-display text-[17px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
+                          {item.title}
+                        </span>
+                        <ChevronRight size={16} className="shrink-0 text-white/80" />
+                      </button>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(item.tags ?? []).slice(0, 2).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                        {epLabel && <span className="text-[12px] font-semibold text-white/80">{epLabel}</span>}
+                      </div>
+
+                      {item.synopsis && (
+                        // "More" opens the same details sheet as the title —
+                        // the synopsis never expands in place.
+                        <button
+                          type="button"
+                          data-tap
+                          onClick={() => setShowDetails(true)}
+                          className="max-w-[78%] text-left text-[13px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
+                        >
+                          <span className="line-clamp-2">{item.synopsis}</span>{" "}
+                          <span className="font-semibold text-white">More</span>
+                        </button>
+                      )}
+                    </div>
+                  }
+                  cta={
+                    item.total_episodes > 1 ? (
+                      <button
+                        type="button"
+                        data-tap
+                        onClick={() => openFullMovie(item)}
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
+                      >
+                        <Play size={16} className="fill-white" />
+                        Watch Full Movie
+                      </button>
+                    ) : null
+                  }
                   actionRail={
                     <ActionRail
                       saved={eng?.saved ?? false}
@@ -416,61 +503,6 @@ export function ForYouFeed() {
                 </div>
               )}
 
-              {/* Title / tags / synopsis / Watch Full Drama — sits above
-                  VideoPlayer's own progress bar, below the action rail. */}
-              <div
-                className="pointer-events-none absolute inset-x-4 z-20 flex flex-col gap-2"
-                style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 56px)" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowDetails(true)}
-                  className="pointer-events-auto flex max-w-[78%] items-center gap-1 text-left"
-                >
-                  <span className="truncate font-display text-[17px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
-                    {item.title}
-                  </span>
-                  <ChevronRight size={16} className="shrink-0 text-white/80" />
-                </button>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {(item.tags ?? []).slice(0, 2).map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white/90"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                  {epLabel && <span className="text-[12px] font-semibold text-white/80">{epLabel}</span>}
-                </div>
-
-                {item.synopsis && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpanded((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(item.episode_id)) next.delete(item.episode_id);
-                        else next.add(item.episode_id);
-                        return next;
-                      })
-                    }
-                    className="pointer-events-auto max-w-[86%] text-left text-[13px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
-                  >
-                    <span className={isExpanded ? "" : "line-clamp-2"}>{item.synopsis}</span>{" "}
-                    {!isExpanded && <span className="font-semibold text-white">More</span>}
-                  </button>
-                )}
-
-                <Link
-                  href={titlePath(item.slug)}
-                  className="pointer-events-auto mt-1 flex h-11 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
-                >
-                  <Play size={16} className="fill-white" />
-                  Watch Full Drama
-                </Link>
-              </div>
             </div>
           );
         })}
@@ -483,6 +515,16 @@ export function ForYouFeed() {
           </div>
         )}
       </div>
+
+      {fullEpisodeId && (
+        <div className="fixed inset-0 z-40 mx-auto max-w-md bg-black">
+          <EpisodeFeed
+            key={fullEpisodeId}
+            initialEpisodeId={fullEpisodeId}
+            onClose={() => setFullEpisodeId(null)}
+          />
+        </div>
+      )}
 
       {shareToast && (
         <div className="absolute inset-x-0 bottom-28 z-30 flex justify-center">

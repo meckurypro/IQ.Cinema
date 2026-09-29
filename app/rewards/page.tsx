@@ -13,13 +13,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import clsx from "clsx";
 
 export default function RewardsPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { wallet, loading: walletLoading } = useWallet(user?.id);
   const { display: balanceDisplay, changed: balanceChanged } = useAnimatedNumber(
     wallet?.coin_balance
   );
-
-  const isCreator = profile?.role === "creator" || profile?.creator_status === "partner";
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-4 pb-24 pt-6">
@@ -81,27 +79,6 @@ export default function RewardsPage() {
           />
         </div>
       </section>
-
-      {/* Creator payouts, only shown to approved creators/partners */}
-      {!authLoading && isCreator && (
-        <section className="mt-7">
-          <h2 className="font-display mb-2.5 text-[17px] font-semibold text-text">
-            Creator earnings
-          </h2>
-          <Link
-            href="/creator/withdraw"
-            className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 transition-colors active:bg-surface-raised"
-          >
-            <div>
-              <p className="text-[12px] text-muted">Available to withdraw</p>
-              <p className="mt-1 font-display text-xl font-semibold text-text">
-                ₦{wallet?.earnings_balance_naira?.toLocaleString() ?? 0}
-              </p>
-            </div>
-            <ChevronRight size={18} className="text-muted" />
-          </Link>
-        </section>
-      )}
 
       {/* Direct CTA to buy coins / subscribe */}
       <Link

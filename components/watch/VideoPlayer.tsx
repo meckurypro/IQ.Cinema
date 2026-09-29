@@ -34,6 +34,9 @@ export function VideoPlayer({
   onEnded,
   onRequestFreshSrc,
   storyboardUrl,
+  hideWatermark = false,
+  bottomContent,
+  cta,
 }: {
   src: string | undefined;
   autoPlay?: boolean;
@@ -55,6 +58,16 @@ export function VideoPlayer({
   onRequestFreshSrc?: () => Promise<string | undefined>;
   // One JPEG sprite sheet of preview frames (see lib/storyboard.ts).
   storyboardUrl?: string | null;
+  // For You: drop the app-icon watermark.
+  hideWatermark?: boolean;
+  // Replaces the built-in title/synopsis block. Lives in the bottom panel, so
+  // it fades in/out with the rest of the controls. Interactive children must
+  // carry a `data-tap` attribute — the panel itself lets taps fall through to
+  // the tap zone, and hidden controls stay untappable.
+  bottomContent?: React.ReactNode;
+  // A full-width button between bottomContent and the progress bar. The
+  // action rail is positioned just above it so the two never overlap.
+  cta?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -327,13 +340,20 @@ export function VideoPlayer({
   // the result to the rail as --rail-bottom.
   const rootRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLParagraphElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const hasCta = !!cta;
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const apply = () => {
       const t = titleRef.current;
+      const c = ctaRef.current;
       let bottom = 96; // no title: sit just above the seek bar
-      if (t) {
+      if (c) {
+        // Rail sits directly above the CTA button, never over it.
+        const r = root.getBoundingClientRect();
+        bottom = Math.max(96, Math.round(r.bottom - c.getBoundingClientRect().top + 12));
+      } else if (t) {
         const r = root.getBoundingClientRect();
         const tr = t.getBoundingClientRect();
         const titleCenterFromBottom = r.bottom - (tr.top + tr.height / 2);
@@ -348,8 +368,9 @@ export function VideoPlayer({
     const ro = new ResizeObserver(apply);
     ro.observe(root);
     if (titleRef.current?.parentElement) ro.observe(titleRef.current.parentElement);
+    if (ctaRef.current) ro.observe(ctaRef.current);
     return () => ro.disconnect();
-  }, [title, synopsis]);
+  }, [title, synopsis, hasCta]);
 
   return (
     <div ref={rootRef} className="relative h-full w-full select-none bg-black">
@@ -454,6 +475,7 @@ export function VideoPlayer({
           showControls — it stays visible whether or not the control layer
           is faded. It sits in the gap between the seek bar and the
           title/synopsis block so it never collides with either. */}
+      {!hideWatermark && (
       <img
         src="/watermark.png"
         alt=""
@@ -461,6 +483,7 @@ export function VideoPlayer({
         className="pointer-events-none absolute left-3.5 z-10 h-8 w-8 select-none rounded-md opacity-55"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 52px)" }}
       />
+      )}
 
       {/* Action rail (save/comments/share/episodes) — fades with the rest
           of the controls layer instead of staying pinned on screen. */}
@@ -478,9 +501,9 @@ export function VideoPlayer({
       {/* Bottom panel: title/synopsis, then progress bar + time */}
       <div
         className={clsx(
-          "absolute inset-x-0 bottom-0 flex flex-col gap-2 px-4 pb-4 pt-10 transition-opacity duration-200",
+          "pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 px-4 pb-4 pt-10 transition-opacity duration-200",
           "bg-gradient-to-t from-black/80 via-black/10 to-transparent",
-          showControls ? "opacity-100" : "pointer-events-none opacity-0"
+          showControls ? "opacity-100" : "opacity-0"
         )}
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
@@ -504,14 +527,27 @@ export function VideoPlayer({
           </div>
         )}
 
-        {(title || synopsis) && (
+        {bottomContent ? (
+          <div
+            className={clsx(
+              "pointer-events-none",
+              showControls && "[&_[data-tap]]:pointer-events-auto"
+            )}
+          >
+            {bottomContent}
+          </div>
+        ) : (
+          (title || synopsis) && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails?.();
             }}
-            className="pointer-events-auto mb-11 max-w-[72%] text-left"
+            className={clsx(
+              "mb-11 max-w-[72%] text-left",
+              showControls ? "pointer-events-auto" : "pointer-events-none"
+            )}
           >
             {title && (
               <p
@@ -527,9 +563,27 @@ export function VideoPlayer({
               </p>
             )}
           </button>
+          )
         )}
 
-        <div className="flex items-center gap-2.5">
+        {cta && (
+          <div
+            ref={ctaRef}
+            className={clsx(
+              "pointer-events-none",
+              showControls && "[&_[data-tap]]:pointer-events-auto"
+            )}
+          >
+            {cta}
+          </div>
+        )}
+
+        <div
+          className={clsx(
+            "flex items-center gap-2.5",
+            showControls ? "pointer-events-auto" : "pointer-events-none"
+          )}
+        >
           <span
             ref={currentTimeRef}
             className={clsx(
