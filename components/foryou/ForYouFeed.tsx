@@ -12,6 +12,7 @@ import { getDeviceId } from "@/lib/device";
 import { useAuth } from "@/hooks/useAuth";
 import { titlePath } from "@/lib/links";
 import { formatCount } from "@/lib/format";
+import { DEFAULT_CATEGORY, type Category } from "@/lib/categories";
 import { EMPTY_COPY, parseForYouTab, rpcTabFor, type ForYouTab } from "@/lib/forYouTabs";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
@@ -70,7 +71,7 @@ export function ForYouFeed() {
   // Tab + collection category live in state (seeded from ?tab=), so switching
   // never navigates — it just swaps which promo episodes fill the feed.
   const [tab, setTab] = useState<ForYouTab>(() => parseForYouTab(searchParams.get("tab")));
-  const [category, setCategory] = useState<string | null>(null);
+  const [category, setCategory] = useState<Category>(DEFAULT_CATEGORY);
 
   const [items, setItems] = useState<PromoItem[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -172,7 +173,6 @@ export function ForYouFeed() {
   function changeTab(next: ForYouTab) {
     if (next === tab) return;
     setTab(next);
-    if (next !== "collections") setCategory(null);
   }
 
   // Splice a promo in right after the current slide (or just scroll to it if
