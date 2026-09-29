@@ -3,7 +3,6 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Search } from "lucide-react";
 import clsx from "clsx";
 import { CATEGORIES } from "@/lib/categories";
@@ -16,11 +15,13 @@ export function ForYouHeader({
   onTabChange,
   category,
   onCategoryChange,
+  onSearch,
 }: {
   tab: ForYouTab;
   onTabChange: (tab: ForYouTab) => void;
   category: string | null;
   onCategoryChange: (category: string | null) => void;
+  onSearch: () => void;
 }) {
   // Same measured-underline treatment as Home (CategoryTabs) and My List
   // (LibraryTabs): measure the active tab's box instead of hard-coding an
@@ -74,13 +75,14 @@ export function ForYouHeader({
             )}
           </div>
         </div>
-        <Link
-          href="/search"
+        <button
+          type="button"
+          onClick={onSearch}
           aria-label="Search"
           className="pointer-events-auto -mt-2 flex h-8 w-8 shrink-0 items-center justify-center text-white"
         >
           <Search size={19} />
-        </Link>
+        </button>
       </div>
 
       {tab === "collections" && (

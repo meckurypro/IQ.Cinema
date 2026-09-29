@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Play, ChevronRight, Flame, Sparkles } from "lucide-react";
+import { Play, ChevronRight, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
 import { getDeviceId } from "@/lib/device";
@@ -20,6 +20,7 @@ import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
 import { EpisodeFeed } from "@/components/watch/EpisodeFeed";
 import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
 import { ForYouHeader } from "@/components/foryou/ForYouHeader";
+import { ForYouSearch, type SearchPromo } from "@/components/foryou/ForYouSearch";
 
 type PromoItem = {
   episode_id: string;
@@ -86,6 +87,7 @@ export function ForYouFeed() {
   const [trayDefaultCost, setTrayDefaultCost] = useState(30);
   const [trayUnlockedIds, setTrayUnlockedIds] = useState<Set<string>>(new Set());
   const [shareToast, setShareToast] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   // "Watch Full Movie" plays the title's episodes in a full-screen layer on
   // top of the feed — the route never changes, so closing lands back on the
   // same promo.
@@ -173,6 +175,33 @@ export function ForYouFeed() {
     if (next !== "collections") setCategory(null);
   }
 
+  // Splice a promo in right after the current slide (or just scroll to it if
+  // it's already in the feed) and make it the active one. Used by the
+  // "Similar titles" deep link and by search results.
+  const injectPromo = useCallback(
+    (row: PromoItem) => {
+      setItems((prev) => {
+        const cur = prev ?? [];
+        if (cur.some((i) => i.episode_id === row.episode_id)) return cur;
+        const idx = cur.findIndex((i) => i.episode_id === activeId);
+        const next = [...cur];
+        next.splice(idx >= 0 ? idx + 1 : cur.length, 0, row);
+        return next;
+      });
+      seedEngagement([row]);
+      setActiveId(row.episode_id);
+      // Two frames: the first lets React commit the new slide, the second
+      // lets layout settle before we scroll to it.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          slideRefs.current.get(row.episode_id)?.scrollIntoView({ block: "start" });
+        })
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeId, seedEngagement]
+  );
+
   // A "Similar titles" tap from inside the details sheet lands here as
   // ?title=<slug> — fetch just that title's promo, splice it in right after
   // the current slide, and scroll to it. Same sheet, feed keeps going.
@@ -184,24 +213,32 @@ export function ForYouFeed() {
       const { data } = await supabase.rpc("get_for_you_promo_by_slug", { p_slug: slug });
       const row = (Array.isArray(data) ? data[0] : data) as PromoItem | undefined;
       if (!row) return;
-      setItems((prev) => {
-        const cur = prev ?? [];
-        const already = cur.find((i) => i.episode_id === row.episode_id);
-        if (already) return cur;
-        const idx = cur.findIndex((i) => i.episode_id === activeId);
-        const next = [...cur];
-        next.splice(idx >= 0 ? idx + 1 : cur.length, 0, row);
-        return next;
-      });
-      seedEngagement([row]);
-      setActiveId(row.episode_id);
-      requestAnimationFrame(() => {
-        slideRefs.current.get(row.episode_id)?.scrollIntoView({ block: "start" });
-      });
+      injectPromo(row);
       router.replace(tab === "for_you" ? "/for-you" : `/for-you?tab=${tab}`, { scroll: false });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, items]);
+
+  // System Back closes the search overlay instead of leaving For You.
+  useEffect(() => {
+    if (!showSearch) return;
+    const marker = `search-${Date.now()}`;
+    window.history.pushState({ ...(window.history.state ?? {}), __search: marker }, "", window.location.href);
+    const onPop = () => {
+      if (window.history.state?.__search !== marker) setShowSearch(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // Closed from the on-screen button / a result tap: drop our entry.
+      if (window.history.state?.__search === marker) window.history.back();
+    };
+  }, [showSearch]);
+
+  function openSearchResult(row: SearchPromo) {
+    setShowSearch(false);
+    injectPromo(row as PromoItem);
+  }
 
   // Signed URL for the active slide + its immediate neighbors.
   useEffect(() => {
@@ -455,7 +492,13 @@ export function ForYouFeed() {
   }
 
   const header = (
-    <ForYouHeader tab={tab} onTabChange={changeTab} category={category} onCategoryChange={setCategory} />
+    <ForYouHeader
+      tab={tab}
+      onTabChange={changeTab}
+      category={category}
+      onCategoryChange={setCategory}
+      onSearch={() => setShowSearch(true)}
+    />
   );
 
   if (!items) {
@@ -474,10 +517,11 @@ export function ForYouFeed() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
       {header}
+      <ForYouSearch open={showSearch} onClose={() => setShowSearch(false)} onSelect={openSearchResult} />
       <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
         {items.map((item) => {
           // The promo unmounts while the full movie is up, so only one video plays.
-          const isActive = item.episode_id === activeId && !fullEpisodeId;
+          const isActive = item.episode_id === activeId && !fullEpisodeId && !showSearch;
           const eng = engagement[item.episode_id];
           const epLabel = item.total_episodes > 0 ? `EP.${Math.max(item.episode_number, 1)}/EP.${item.total_episodes}` : null;
 
@@ -517,8 +561,7 @@ export function ForYouFeed() {
                           )}
                         </span>
                       ) : item.is_new ? (
-                        <span className="flex w-fit items-center gap-1 rounded-full bg-pink px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                          <Sparkles size={12} />
+                        <span className="w-fit rounded-[4px] bg-pink px-2 py-[3px] text-[10px] font-extrabold uppercase leading-none tracking-[0.1em] text-white">
                           New
                         </span>
                       ) : null}
