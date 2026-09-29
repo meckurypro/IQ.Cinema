@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Lock, Play, Check } from "lucide-react";
 import clsx from "clsx";
 import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
+import { useI18n } from "@/hooks/useI18n";
 
 export type TrayEpisode = {
   id: string;
@@ -36,8 +37,9 @@ export function EpisodeTray({
   // feed to it instead of navigating (no reload, history stays clean).
   onSelect?: (episodeId: string) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <BottomSheet open={open} onClose={onClose} title={`Episodes · ${episodes.length}`}>
+    <BottomSheet open={open} onClose={onClose} title={t("watch.episodesCount", { n: episodes.length })}>
       <div className="grid grid-cols-4 gap-2.5 px-3 pb-3 pt-1 sm:grid-cols-5">
         {episodes.map((ep) => {
           const isFree = ep.episode_number <= freeCount;
@@ -96,7 +98,7 @@ export function EpisodeTray({
 
         {!episodes.length && (
           <p className="col-span-4 py-6 text-center text-sm text-muted sm:col-span-5">
-            No episodes published yet.
+            {t("title.noEpisodes")}
           </p>
         )}
       </div>

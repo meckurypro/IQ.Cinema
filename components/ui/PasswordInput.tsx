@@ -5,11 +5,13 @@
 import { forwardRef, InputHTMLAttributes, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className, ...props }, ref) => {
+    const { t } = useI18n();
     const [visible, setVisible] = useState(false);
 
     return (
@@ -27,7 +29,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           type="button"
           onClick={() => setVisible((v) => !v)}
           tabIndex={-1}
-          aria-label={visible ? "Hide password" : "Show password"}
+          aria-label={visible ? t("auth.hidePassword") : t("auth.showPassword")}
           className="absolute inset-y-0 right-0 flex items-center px-3.5 text-muted"
         >
           {visible ? <EyeOff size={17} /> : <Eye size={17} />}

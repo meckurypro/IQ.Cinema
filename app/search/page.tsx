@@ -1,5 +1,7 @@
 // app/search/page.tsx
 
+import { SearchIntro } from "@/components/search/SearchIntro";
+
 export default function SearchPage({
   searchParams,
 }: {
@@ -7,10 +9,7 @@ export default function SearchPage({
 }) {
   return (
     <main className="mx-auto min-h-screen max-w-md px-4 pb-24 pt-6">
-      <h1 className="font-display text-2xl font-semibold text-text">
-        {searchParams.q ? `Results for "${searchParams.q}"` : "Search"}
-      </h1>
-      <p className="mt-2 text-sm text-muted">Search results are coming soon.</p>
+      <SearchIntro q={searchParams.q} />
     </main>
   );
 }

@@ -2,9 +2,9 @@
 
 // Mirrors the CHECK constraint on public.titles.category.
 export const CATEGORIES = [
-  { value: "drama", label: "Drama" },
-  { value: "story", label: "Story" },
-  { value: "anime", label: "Anime" },
+  { value: "drama", label: "Drama", labelKey: "category.drama" },
+  { value: "story", label: "Story", labelKey: "category.story" },
+  { value: "anime", label: "Anime", labelKey: "category.anime" },
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number]["value"];

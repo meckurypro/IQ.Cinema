@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { formatEpisodeCount } from "@/lib/format";
 import { useBlobUrl, type DownloadFolder } from "@/hooks/useOfflineDownloads";
 import { SelectDot } from "@/components/library/SelectDot";
+import { useI18n } from "@/hooks/useI18n";
 
 // One movie folder on the Downloads screen. Same 3:4 poster card as My List.
 export function FolderCard({
@@ -21,6 +22,7 @@ export function FolderCard({
   selected: boolean;
   onToggleSelect: () => void;
 }) {
+  const { t } = useI18n();
   const poster = useBlobUrl(folder.title.poster);
   const name = folder.title.title.trim();
   const count = folder.episodes.length;
@@ -54,14 +56,14 @@ export function FolderCard({
 
         <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
           <Folder size={11} className="fill-white/90" />
-          {count} EP
+          {t("common.epCount", { n: count })}
         </span>
 
         {editing && <SelectDot selected={selected} className="absolute bottom-1.5 right-1.5" />}
       </div>
 
       <p className="mt-2 truncate text-[14px] font-semibold text-text">{name}</p>
-      <p className="mt-0.5 truncate text-[12.5px] text-muted">{formatEpisodeCount(count)}</p>
+      <p className="mt-0.5 truncate text-[12.5px] text-muted">{formatEpisodeCount(count, t)}</p>
     </>
   );
 
@@ -71,7 +73,7 @@ export function FolderCard({
         type="button"
         onClick={onToggleSelect}
         aria-pressed={selected}
-        aria-label={`${selected ? "Deselect" : "Select"} ${name}`}
+        aria-label={t(selected ? "downloads.deselectItem" : "downloads.selectItem", { name })}
         className="group min-w-0 text-left"
       >
         {body}

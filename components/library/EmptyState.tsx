@@ -1,7 +1,10 @@
 // components/library/EmptyState.tsx
 
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/hooks/useI18n";
 
 function Cup() {
   return (
@@ -22,21 +25,22 @@ function Cup() {
 }
 
 export function EmptyState({
-  message = "Go to the homepage to discover more content.",
-  actionLabel = "Discover More",
+  message,
+  actionLabel,
   href = "/",
 }: {
   message?: string;
   actionLabel?: string;
   href?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className="fade-in flex flex-col items-center px-8 pt-16 text-center">
       <Cup />
-      <p className="mt-6 max-w-[16rem] text-[17px] leading-snug text-muted">{message}</p>
+      <p className="mt-6 max-w-[16rem] text-[17px] leading-snug text-muted">{message ?? t("common.discoverDefault")}</p>
       <Link href={href} className="mt-6">
         <Button size="lg" className="min-w-[13rem]">
-          {actionLabel}
+          {actionLabel ?? t("common.discoverMore")}
         </Button>
       </Link>
     </div>

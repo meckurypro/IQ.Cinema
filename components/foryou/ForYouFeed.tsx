@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { titlePath } from "@/lib/links";
 import { formatCount } from "@/lib/format";
 import { DEFAULT_CATEGORY, type Category } from "@/lib/categories";
-import { EMPTY_COPY, parseForYouTab, rpcTabFor, type ForYouTab } from "@/lib/forYouTabs";
+import { EMPTY_COPY_KEY, parseForYouTab, rpcTabFor, type ForYouTab } from "@/lib/forYouTabs";
 import { VideoPlayer } from "@/components/watch/VideoPlayer";
 import { ActionRail } from "@/components/watch/ActionRail";
 import { CommentsSheet } from "@/components/watch/CommentsSheet";
@@ -22,6 +22,7 @@ import { EpisodeFeed } from "@/components/watch/EpisodeFeed";
 import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
 import { ForYouHeader } from "@/components/foryou/ForYouHeader";
 import { ForYouSearch, type SearchPromo } from "@/components/foryou/ForYouSearch";
+import { useI18n } from "@/hooks/useI18n";
 
 type PromoItem = {
   episode_id: string;
@@ -63,6 +64,7 @@ function engagementFor(item: PromoItem): Engagement {
 }
 
 export function ForYouFeed() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -562,7 +564,7 @@ export function ForYouFeed() {
                         </span>
                       ) : item.is_new ? (
                         <span className="w-fit rounded-[4px] bg-pink px-2 py-[3px] text-[10px] font-extrabold uppercase leading-none tracking-[0.1em] text-white">
-                          New
+                          {t("foryou.badgeNew")}
                         </span>
                       ) : null}
                       <button
@@ -599,7 +601,7 @@ export function ForYouFeed() {
                           className="max-w-[78%] text-left text-[13px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
                         >
                           <span className="line-clamp-2">{item.synopsis}</span>{" "}
-                          <span className="font-semibold text-white">More</span>
+                          <span className="font-semibold text-white">{t("foryou.more")}</span>
                         </button>
                       )}
                     </div>
@@ -613,7 +615,7 @@ export function ForYouFeed() {
                         className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
                       >
                         <Play size={16} className="fill-white" />
-                        Watch Full Movie
+                        {t("foryou.watchFullMovie")}
                       </button>
                     ) : null
                   }
@@ -646,7 +648,7 @@ export function ForYouFeed() {
 
         {!items.length && (
           <div className="flex h-full items-center justify-center px-8 text-center">
-            <p className="text-[14px] text-white/70">{EMPTY_COPY[tab]}</p>
+            <p className="text-[14px] text-white/70">{t(EMPTY_COPY_KEY[tab])}</p>
           </div>
         )}
       </div>
@@ -664,7 +666,7 @@ export function ForYouFeed() {
       {shareToast && (
         <div className="absolute inset-x-0 bottom-28 z-30 flex justify-center">
           <span className="rounded-full bg-black/70 px-3.5 py-1.5 text-[12px] font-medium text-white">
-            Link copied
+            {t("foryou.linkCopied")}
           </span>
         </div>
       )}

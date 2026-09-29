@@ -8,16 +8,17 @@ import { Check, ChevronRight, Download, MonitorPlay, Pause, Play, RotateCw } fro
 import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 import { ProgressRing } from "@/components/downloads/ProgressRing";
 import type { OfflineEpisode } from "@/lib/offline/db";
+import { useI18n } from "@/hooks/useI18n";
 
 // Every episode is stored as a single rendition today (see video_width /
 // video_height on the row) — there's no ladder of bitrates to switch
 // between yet. This still gives the viewer a real, honest quality readout
 // instead of a fake picklist; once multiple renditions exist server-side,
 // swap this one row for a mapped list and wire onSelect to change src.
-function qualityLabel(height: number | null) {
-  if (!height) return "Auto";
-  if (height >= 1080) return `${height}p · Full HD`;
-  if (height >= 720) return `${height}p · HD`;
+function qualityLabel(height: number | null, t: ReturnType<typeof useI18n>["t"]) {
+  if (!height) return t("watch.qualityAuto");
+  if (height >= 1080) return t("watch.qualityFullHd", { h: height });
+  if (height >= 720) return t("watch.qualityHd", { h: height });
   return `${height}p`;
 }
 
@@ -47,6 +48,7 @@ export function MoreSheet({
   // The movie's folder inside the in-app Downloads screen.
   downloadsHref: string;
 }) {
+  const { t } = useI18n();
   const [starting, setStarting] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -57,7 +59,7 @@ export function MoreSheet({
     try {
       await onDownload();
     } catch (e) {
-      setDownloadError(e instanceof Error && e.message ? e.message : "Couldn't start the download. Try again.");
+      setDownloadError(e instanceof Error && e.message ? e.message : t("watch.downloadStartError"));
     } finally {
       setStarting(false);
     }
@@ -69,15 +71,15 @@ export function MoreSheet({
     downloadState && downloadState.totalBytes > 0 ? downloadState.receivedBytes / downloadState.totalBytes : -1;
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Playback options">
+    <BottomSheet open={open} onClose={onClose} title={t("watch.playbackOptions")}>
       <div className="flex flex-col gap-1 px-3 pb-2 pt-1">
         <div className="flex items-center justify-between rounded-md px-1.5 py-2.5">
           <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
             <MonitorPlay size={18} className="text-muted" />
-            Quality
+            {t("watch.quality")}
           </span>
           <span className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
-            {qualityLabel(videoHeight)}
+            {qualityLabel(videoHeight, t)}
             <Check size={15} className="text-pink" />
           </span>
         </div>
@@ -94,10 +96,10 @@ export function MoreSheet({
             <span className="flex flex-col">
               <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
                 <Download size={18} className="text-muted" />
-                {starting ? "Starting…" : "Download"}
+                {starting ? t("watch.starting") : t("watch.download")}
               </span>
               <span className="ml-[30px] mt-0.5 text-[12px] text-muted">
-                {downloadDisabledReason ?? "Watch offline in the app"}
+                {downloadDisabledReason ?? t("watch.downloadOffline")}
               </span>
             </span>
           </button>
@@ -108,10 +110,14 @@ export function MoreSheet({
             <span className="flex flex-col">
               <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
                 <Download size={18} className="text-muted" />
-                {status === "queued" ? "Waiting to download…" : `Downloading${fraction >= 0 ? ` ${Math.floor(fraction * 100)}%` : "…"}`}
+                {status === "queued"
+                  ? t("watch.waitingToDownload")
+                  : fraction >= 0
+                    ? t("watch.downloadingPct", { pct: Math.floor(fraction * 100) })
+                    : t("watch.downloading")}
               </span>
             </span>
-            <button type="button" onClick={onPauseDownload} aria-label="Pause download">
+            <button type="button" onClick={onPauseDownload} aria-label={t("watch.pauseDownload")}>
               <ProgressRing progress={fraction} size={34}>
                 <Pause size={12} className="fill-current" />
               </ProgressRing>
@@ -124,13 +130,17 @@ export function MoreSheet({
             <span className="flex flex-col">
               <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
                 <Download size={18} className="text-muted" />
-                {status === "error" ? "Download failed" : downloadState.error === "offline" ? "Waiting for connection" : "Download paused"}
+                {status === "error"
+                  ? t("watch.downloadFailed")
+                  : downloadState.error === "offline"
+                    ? t("watch.waitingForConnection")
+                    : t("watch.downloadPaused")}
               </span>
               {status === "error" && downloadState.error && (
                 <span className="ml-[30px] mt-0.5 text-[12px] text-crimson">{downloadState.error}</span>
               )}
             </span>
-            <button type="button" onClick={onResumeDownload} aria-label={status === "error" ? "Retry download" : "Resume download"}>
+            <button type="button" onClick={onResumeDownload} aria-label={status === "error" ? t("watch.retryDownload") : t("watch.resumeDownload")}>
               <ProgressRing progress={fraction} size={34}>
                 {status === "error" ? <RotateCw size={12} /> : <Play size={12} className="ml-0.5 fill-current" />}
               </ProgressRing>
@@ -148,9 +158,9 @@ export function MoreSheet({
               <span className="flex flex-col">
                 <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
                   <Check size={18} className="text-gold" />
-                  Downloaded
+                  {t("watch.downloaded")}
                 </span>
-                <span className="ml-[30px] mt-0.5 text-[12px] text-muted">View in Downloads</span>
+                <span className="ml-[30px] mt-0.5 text-[12px] text-muted">{t("watch.viewInDownloads")}</span>
               </span>
               <ChevronRight size={16} className="text-muted" />
             </Link>
@@ -159,7 +169,7 @@ export function MoreSheet({
               onClick={onRemoveDownload}
               className="rounded-md px-1.5 py-2 text-left text-[13px] font-medium text-crimson transition-colors active:bg-surface-raised"
             >
-              <span className="ml-[30px]">Remove download</span>
+              <span className="ml-[30px]">{t("watch.removeDownload")}</span>
             </button>
           </>
         )}

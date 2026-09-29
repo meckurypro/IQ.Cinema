@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
 import { useUnlockedEpisodeIds } from "@/hooks/useUnlockedEpisodes";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 
@@ -33,6 +34,7 @@ export function TitleActions({
   freeCount: number;
   defaultCost: number;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { user } = useAuth();
   const [following, setFollowing] = useState(false);
@@ -94,7 +96,7 @@ export function TitleActions({
       if (rpcError) throw rpcError;
     } catch {
       setFollowing(!next);
-      setError("Couldn't update your list. Try again.");
+      setError(t("title.listError"));
     } finally {
       busyRef.current = false; // never leave the button locked
     }
@@ -116,7 +118,7 @@ export function TitleActions({
       if (rpcError) throw rpcError;
     } catch {
       setReminded(!next);
-      setError("Couldn't update your reminder. Try again.");
+      setError(t("title.reminderError"));
     } finally {
       busyRef.current = false;
     }
@@ -133,7 +135,7 @@ export function TitleActions({
           aria-pressed={reminded}
         >
           {reminded ? <BellRing size={17} className="fill-pink text-pink" /> : <Bell size={17} />}
-          {reminded ? "Reminder set" : "Remind me"}
+          {reminded ? t("title.reminderSet") : t("title.remindMe")}
         </Button>
         {error && <p className="mt-2 text-[12px] text-crimson">{error}</p>}
       </div>
@@ -148,12 +150,12 @@ export function TitleActions({
           className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
         >
           <Play size={16} className="fill-white" />
-          Watch now
+          {t("title.watchNow")}
         </Link>
         <Button
           variant="secondary"
           size="icon"
-          aria-label={following ? "Unfollow" : "Follow"}
+          aria-label={following ? t("title.unfollow") : t("title.follow")}
           aria-pressed={following}
           onClick={toggleFollow}
         >
@@ -175,12 +177,12 @@ export function TitleActions({
         >
           <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
             <ListVideo size={18} className="text-muted" />
-            Episodes
+            {t("title.episodes")}
           </span>
           <ChevronRight size={18} className="text-muted" />
         </button>
       ) : (
-        <p className="mt-3 text-sm text-muted">No episodes published yet.</p>
+        <p className="mt-3 text-sm text-muted">{t("title.noEpisodes")}</p>
       )}
 
       {error && <p className="mt-2 text-[12px] text-crimson">{error}</p>}

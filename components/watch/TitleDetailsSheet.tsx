@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCount } from "@/lib/format";
+import { useI18n } from "@/hooks/useI18n";
 
 type SimilarTitle = {
   id: string;
@@ -42,6 +43,7 @@ export function TitleDetailsSheet({
   // same sheet, different exit ("onion").
   similarHref?: (t: SimilarTitle) => string;
 }) {
+  const { t } = useI18n();
   const supabase = createClient();
   const [tags, setTags] = useState<string[] | null>(null);
   const [similar, setSimilar] = useState<SimilarTitle[] | null>(null);
@@ -77,7 +79,7 @@ export function TitleDetailsSheet({
   }, [open, load]);
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Details">
+    <BottomSheet open={open} onClose={onClose} title={t("watch.details")}>
       <div className="flex flex-col gap-4 px-3 pb-3 pt-1">
         <div className="flex gap-3">
           {posterUrl && (
@@ -89,7 +91,7 @@ export function TitleDetailsSheet({
             <h3 className="font-display text-[17px] font-semibold text-text">{title}</h3>
             <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
               <Eye size={13} />
-              {formatCount(views)} views
+              {t("watch.views", { n: formatCount(views) })}
             </p>
             {contentRating && (
               <span className="mt-2 inline-block rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted">
@@ -119,7 +121,7 @@ export function TitleDetailsSheet({
         ) : null}
 
         <div>
-          <h4 className="mb-2 text-[14px] font-semibold text-text">Similar titles</h4>
+          <h4 className="mb-2 text-[14px] font-semibold text-text">{t("watch.similarTitles")}</h4>
           {similar === null ? (
             <div className="flex gap-2.5 overflow-x-auto">
               {[1, 2, 3].map((i) => (
@@ -146,7 +148,7 @@ export function TitleDetailsSheet({
               ))}
             </div>
           ) : (
-            <p className="py-2 text-[13px] text-muted">Nothing similar published yet.</p>
+            <p className="py-2 text-[13px] text-muted">{t("watch.nothingSimilar")}</p>
           )}
         </div>
       </div>

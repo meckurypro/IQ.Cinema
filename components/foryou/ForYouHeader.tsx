@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { CATEGORIES, type Category } from "@/lib/categories";
 import { SegmentedControl } from "@/components/library/SegmentedControl";
 import { FOR_YOU_TABS, type ForYouTab } from "@/lib/forYouTabs";
+import { useI18n } from "@/hooks/useI18n";
 
 // All four tabs switch the feed in place — no navigation. Collections adds a
 // category chip row (All / Drama / Story / Anime) under the strip.
@@ -24,6 +25,7 @@ export function ForYouHeader({
   onCategoryChange: (category: Category) => void;
   onSearch: () => void;
 }) {
+  const { t } = useI18n();
   // Same measured-underline treatment as Home (CategoryTabs) and My List
   // (LibraryTabs): measure the active tab's box instead of hard-coding an
   // offset so it stays lined up if the label or font changes.
@@ -49,8 +51,8 @@ export function ForYouHeader({
       <div className="flex items-center gap-3">
         {/* Scrolls sideways on very narrow phones rather than clipping. */}
         <div className="no-scrollbar pointer-events-auto min-w-0 flex-1 overflow-x-auto">
-          <div role="tablist" aria-label="For You" className="relative flex w-max items-center gap-4 pb-2">
-            {FOR_YOU_TABS.map(({ key, label }) => (
+          <div role="tablist" aria-label={t("foryou.title")} className="relative flex w-max items-center gap-4 pb-2">
+            {FOR_YOU_TABS.map(({ key, labelKey }) => (
               <button
                 key={key}
                 type="button"
@@ -65,7 +67,7 @@ export function ForYouHeader({
                   tab === key ? "text-white" : "text-white/60"
                 )}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
             {center !== null && (
@@ -80,7 +82,7 @@ export function ForYouHeader({
         <button
           type="button"
           onClick={onSearch}
-          aria-label="Search"
+          aria-label={t("common.search")}
           className="pointer-events-auto -mt-2 flex h-8 w-8 shrink-0 items-center justify-center text-white"
         >
           <Search size={19} />
@@ -91,7 +93,7 @@ export function ForYouHeader({
         // Same control (and options) as My List's category filter.
         <div className="pointer-events-auto mt-1">
           <SegmentedControl
-            ariaLabel="Collection"
+            ariaLabel={t("foryou.collection")}
             tone="overlay"
             options={CATEGORIES}
             value={category}

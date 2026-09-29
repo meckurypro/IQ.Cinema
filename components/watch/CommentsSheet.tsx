@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
 
 type Comment = {
   id: string;
@@ -17,12 +18,12 @@ type Comment = {
   profiles: { display_name: string | null; username: string; avatar_url: string | null } | null;
 };
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: ReturnType<typeof useI18n>["t"]) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+  if (s < 60) return t("common.now");
+  if (s < 3600) return t("common.minutesShort", { n: Math.floor(s / 60) });
+  if (s < 86400) return t("common.hoursShort", { n: Math.floor(s / 3600) });
+  return t("common.daysShort", { n: Math.floor(s / 86400) });
 }
 
 export function CommentsSheet({
@@ -39,6 +40,7 @@ export function CommentsSheet({
   onCountChange: (next: number) => void;
 }) {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const supabase = createClient();
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -82,13 +84,13 @@ export function CommentsSheet({
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={`${count.toLocaleString()} comments`}>
+    <BottomSheet open={open} onClose={onClose} title={t("watch.commentsTitle", { n: count.toLocaleString(lang) })}>
       <div className="flex flex-col gap-3 px-3 pb-2 pt-1">
         {comments === null && [1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
 
         {comments !== null && comments.length === 0 && (
           <p className="py-8 text-center text-sm text-muted">
-            No comments yet — be the first to say something.
+            {t("watch.noComments")}
           </p>
         )}
 
@@ -102,8 +104,8 @@ export function CommentsSheet({
             </div>
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-text">
-                {c.profiles?.display_name || c.profiles?.username || "Viewer"}
-                <span className="ml-2 font-normal text-muted">{timeAgo(c.created_at)}</span>
+                {c.profiles?.display_name || c.profiles?.username || t("watch.viewer")}
+                <span className="ml-2 font-normal text-muted">{timeAgo(c.created_at, t)}</span>
               </p>
               <p className="mt-0.5 break-words text-[14px] text-text/90">{c.body}</p>
             </div>
@@ -120,14 +122,14 @@ export function CommentsSheet({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           maxLength={500}
-          placeholder={user ? "Add a comment…" : "Sign in to comment"}
+          placeholder={user ? t("watch.addComment") : t("watch.signInToComment")}
           disabled={!user}
           className="h-10 flex-1 rounded-full border border-border bg-surface-raised px-4 text-[14px] text-text outline-none placeholder:text-muted disabled:opacity-60"
         />
         <button
           onClick={submit}
           disabled={!user || !draft.trim() || posting}
-          aria-label="Post comment"
+          aria-label={t("watch.postComment")}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-pink to-crimson text-white disabled:opacity-40"
         >
           <Send size={16} />

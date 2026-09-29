@@ -6,6 +6,7 @@ import { Bookmark, MessageCircle, Layers } from "lucide-react";
 import { ShareIcon } from "@/components/watch/ShareIcon";
 import clsx from "clsx";
 import { formatCount } from "@/lib/format";
+import { useI18n } from "@/hooks/useI18n";
 
 function RailButton({
   icon,
@@ -67,6 +68,7 @@ export function ActionRail({
   onShare: () => void;
   onOpenEpisodes: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className="pointer-events-none absolute right-3 z-20 flex flex-col items-center gap-1"
@@ -76,25 +78,25 @@ export function ActionRail({
         icon={<Bookmark size={32} className={saved ? "fill-gold text-gold" : "text-white"} />}
         count={saveCount}
         active={saved}
-        label={saved ? "Remove from My List" : "Save to My List"}
+        label={saved ? t("watch.removeFromList") : t("watch.saveToList")}
         onClick={onToggleSave}
       />
       <RailButton
         icon={<MessageCircle size={31} className="text-white" />}
         count={commentCount}
-        label="View comments"
+        label={t("watch.viewComments")}
         onClick={onOpenComments}
       />
       <RailButton
         icon={<ShareIcon size={30} className="text-white" />}
         count={shareCount}
-        label="Share"
+        label={t("watch.share")}
         showLabel
         onClick={onShare}
       />
       <RailButton
         icon={<Layers size={30} className="text-white" />}
-        label="Episodes"
+        label={t("title.episodes")}
         showLabel
         onClick={onOpenEpisodes}
       />

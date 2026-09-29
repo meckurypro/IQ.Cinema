@@ -1,9 +1,12 @@
 // components/title/TitleCard.tsx
 
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Flame } from "lucide-react";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 export type TitleCardData = {
   id: string;
@@ -26,6 +29,7 @@ function formatViews(n: number) {
 }
 
 export function TitleCard({ title, size = "md" }: { title: TitleCardData; size?: "sm" | "md" }) {
+  const { t } = useI18n();
   const width = size === "sm" ? "w-28" : "w-36";
 
   const href = title.first_episode_id ? `/watch/${title.first_episode_id}` : `/title/${title.slug}`;
@@ -42,12 +46,12 @@ export function TitleCard({ title, size = "md" }: { title: TitleCardData; size?:
             className="object-cover transition-transform duration-300 group-active:scale-95"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-muted text-xs">No poster</div>
+          <div className="flex h-full items-center justify-center text-muted text-xs">{t("common.poster.none")}</div>
         )}
 
         {title.is_exclusive && (
           <span className="absolute left-1.5 top-1.5 rounded-sm bg-crimson px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            Exclusive
+            {t("title.exclusive")}
           </span>
         )}
 

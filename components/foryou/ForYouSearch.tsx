@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ArrowLeft, Clock, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatEpisodeCount } from "@/lib/format";
+import { useI18n } from "@/hooks/useI18n";
 
 // Same row shape the feed uses (get_for_you_feed_v2 / search_for_you_promos).
 export type SearchPromo = {
@@ -112,6 +113,7 @@ function ResultRow({
   tokens: string[];
   onPick: (item: SearchPromo) => void;
 }) {
+  const { t } = useI18n();
   const art = item.poster_url ?? item.thumbnail_url;
   const snippet = snippetFor(item.synopsis, tokens);
   return (
@@ -128,7 +130,7 @@ function ResultRow({
           <Highlight text={item.title} tokens={tokens} />
         </span>
         <span className="mt-0.5 block truncate text-[12px] text-white/55">
-          {[item.tags?.[0], item.total_episodes > 0 ? formatEpisodeCount(item.total_episodes) : null]
+          {[item.tags?.[0], item.total_episodes > 0 ? formatEpisodeCount(item.total_episodes, t) : null]
             .filter(Boolean)
             .join(" · ")}
         </span>
@@ -151,6 +153,7 @@ export function ForYouSearch({
   onClose: () => void;
   onSelect: (item: SearchPromo) => void;
 }) {
+  const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
   const tokenRef = useRef(0);
@@ -248,7 +251,7 @@ export function ForYouSearch({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close search"
+          aria-label={t("foryou.closeSearch")}
           className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
         >
           <ArrowLeft size={22} />
@@ -270,7 +273,7 @@ export function ForYouSearch({
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Search titles or story words"
+            placeholder={t("foryou.searchPlaceholder")}
             className="min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/40 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
@@ -280,7 +283,7 @@ export function ForYouSearch({
                 setQuery("");
                 inputRef.current?.focus();
               }}
-              aria-label="Clear"
+              aria-label={t("foryou.clear")}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/25 text-black"
             >
               <X size={12} strokeWidth={3} />
@@ -303,12 +306,10 @@ export function ForYouSearch({
             {!results.length && !loading && settledQuery === q && (
               <div className="px-8 pt-16 text-center">
                 <p className="text-[15px] font-semibold text-white">
-                  {failed ? "Search isn't available right now" : `No promos match “${q}”`}
+                  {failed ? t("foryou.searchUnavailable") : t("foryou.noPromosMatch", { q })}
                 </p>
                 <p className="mt-1.5 text-[13px] text-white/55">
-                  {failed
-                    ? "Check your connection and try again."
-                    : "Try a different title, or a word from the story."}
+                  {failed ? t("foryou.checkConnection") : t("foryou.tryDifferent")}
                 </p>
               </div>
             )}
@@ -318,7 +319,7 @@ export function ForYouSearch({
             {recent.length > 0 && (
               <section className="pt-3">
                 <div className="flex items-center justify-between px-4 pb-1">
-                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-white/45">Recent</h3>
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-white/45">{t("foryou.recent")}</h3>
                   <button
                     type="button"
                     onClick={() => {
@@ -327,7 +328,7 @@ export function ForYouSearch({
                     }}
                     className="text-[12px] font-semibold text-white/60"
                   >
-                    Clear
+                    {t("foryou.clear")}
                   </button>
                 </div>
                 {recent.map((r) => (
@@ -346,7 +347,7 @@ export function ForYouSearch({
             {popular.length > 0 && (
               <section className="pt-3">
                 <h3 className="px-4 pb-1 text-[12px] font-semibold uppercase tracking-wide text-white/45">
-                  Trending now
+                  {t("foryou.trendingNow")}
                 </h3>
                 {popular.map((item) => (
                   <ResultRow key={item.episode_id} item={item} tokens={[]} onPick={pick} />

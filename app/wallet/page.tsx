@@ -14,19 +14,22 @@ import { CoinPackCard } from "@/components/wallet/CoinPackCard";
 import { SubscriptionCard } from "@/components/wallet/SubscriptionCard";
 import { initializePaystackPurchase, redirectToPaystackCheckout } from "@/lib/paystack";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 import clsx from "clsx";
 
-const TIPS = [
-  "Content Selection: You can choose to unlock free or paid content on IQ Cinema.",
-  "Reward Coins: Earn Reward Coins through tasks and top-up bonuses. These can be used like regular Coins to unlock episodes.",
-  "Coins will be used first when unlocking an episode. If the amount is insufficient, Reward Coins will automatically be used.",
-  "Privilege: Enjoy unlimited access to all series on IQ Cinema during your subscription period.",
-  "Activation: Subscriptions are activated immediately after a successful payment.",
-  "Auto-Renewal: Subscriptions auto-renew at the original price unless canceled beforehand.",
+const TIP_KEYS: MessageKey[] = [
+  "wallet.tip1",
+  "wallet.tip2",
+  "wallet.tip3",
+  "wallet.tip4",
+  "wallet.tip5",
+  "wallet.tip6",
 ];
 
 export default function WalletPage() {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const { state, error: stateError, refresh } = useStoreState();
   const { display: coinsDisplay, changed: coinsChanged } = useAnimatedNumber(state?.balances.coins);
   const { display: rewardDisplay, changed: rewardChanged } = useAnimatedNumber(
@@ -48,7 +51,7 @@ export default function WalletPage() {
 
   async function handleBuy(type: "coins" | "subscription", id: string) {
     if (!user) {
-      setError("Sign in to continue.");
+      setError(t("wallet.signInToContinue"));
       return;
     }
     setError(null);
@@ -67,10 +70,10 @@ export default function WalletPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/profile" aria-label="Back" className="text-text">
+        <Link href="/profile" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Store</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("wallet.title")}</h1>
       </div>
 
       <div className="mt-4 flex items-stretch rounded-lg border border-border bg-surface p-4">
@@ -87,7 +90,7 @@ export default function WalletPage() {
               {coinsDisplay.toLocaleString()}
             </span>
           )}
-          <span className="text-[12px] text-muted">Coins</span>
+          <span className="text-[12px] text-muted">{t("wallet.coins")}</span>
         </div>
         <div className="w-px bg-border" />
         <div className="flex flex-1 flex-col items-center gap-1">
@@ -103,7 +106,7 @@ export default function WalletPage() {
               {rewardDisplay.toLocaleString()}
             </span>
           )}
-          <span className="text-[12px] text-muted">Reward Coins</span>
+          <span className="text-[12px] text-muted">{t("wallet.rewardCoins")}</span>
         </div>
       </div>
 
@@ -116,17 +119,18 @@ export default function WalletPage() {
       {!loading && state.membership.active && (
         <div className="mt-4 rounded-lg border border-gold bg-gold-soft px-4 py-3">
           <p className="text-[13px] font-semibold text-text">
-            👑 {state.membership.plan_name} is active
+            👑 {t("wallet.planActive", { plan: state.membership.plan_name ?? "" })}
           </p>
           <p className="mt-0.5 text-[12px] text-muted">
-            {state.membership.auto_renew ? "Renews" : "Ends"} on{" "}
-            {new Date(state.membership.ends_at!).toLocaleDateString()}
+            {t(state.membership.auto_renew ? "wallet.renewsOn" : "wallet.endsOn", {
+              date: new Date(state.membership.ends_at!).toLocaleDateString(lang),
+            })}
           </p>
         </div>
       )}
 
       <section className="mt-6">
-        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Coins</h2>
+        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("wallet.coins")}</h2>
         <div className="grid grid-cols-2 gap-2.5">
           {loading ? (
             <>
@@ -150,7 +154,7 @@ export default function WalletPage() {
       </section>
 
       <section className="mt-7 pb-4">
-        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Subscription</h2>
+        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("wallet.subscription")}</h2>
         <div className="space-y-3">
           {loading ? (
             <>
@@ -172,11 +176,11 @@ export default function WalletPage() {
       </section>
 
       <section className="mt-2 pb-6">
-        <h2 className="font-display mb-2 text-[14px] font-semibold text-text">Tips</h2>
+        <h2 className="font-display mb-2 text-[14px] font-semibold text-text">{t("wallet.tips")}</h2>
         <ol className="space-y-2 text-[12.5px] leading-relaxed text-muted">
-          {TIPS.map((tip, i) => (
-            <li key={i}>
-              {i + 1}. {tip}
+          {TIP_KEYS.map((key, i) => (
+            <li key={key}>
+              {i + 1}. {t(key)}
             </li>
           ))}
         </ol>

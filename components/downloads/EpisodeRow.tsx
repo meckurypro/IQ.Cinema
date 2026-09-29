@@ -10,26 +10,31 @@ import { useBlobUrl } from "@/hooks/useOfflineDownloads";
 import type { OfflineEpisode } from "@/lib/offline/db";
 import { SelectDot } from "@/components/library/SelectDot";
 import { ProgressRing } from "./ProgressRing";
+import { useI18n } from "@/hooks/useI18n";
 
 function fraction(ep: OfflineEpisode) {
   return ep.totalBytes > 0 ? ep.receivedBytes / ep.totalBytes : -1;
 }
 
-function statusLine(ep: OfflineEpisode) {
+function statusLine(ep: OfflineEpisode, t: ReturnType<typeof useI18n>["t"]) {
   const pct = ep.totalBytes > 0 ? `${Math.floor(fraction(ep) * 100)}%` : null;
   switch (ep.status) {
     case "complete":
-      return formatDuration(ep.durationSeconds) || "Ready to watch";
+      return formatDuration(ep.durationSeconds) || t("downloads.readyToWatch");
     case "queued":
-      return "Waiting to download…";
+      return t("watch.waitingToDownload");
     case "downloading":
-      return pct ? `Downloading ${pct}` : "Downloading…";
+      return pct ? t("watch.downloadingPct", { pct: Math.floor(fraction(ep) * 100) }) : t("watch.downloading");
     case "processing": // legacy rows only; nothing is processed on-device anymore
-      return formatDuration(ep.durationSeconds) || "Ready to watch";
+      return formatDuration(ep.durationSeconds) || t("downloads.readyToWatch");
     case "paused":
-      return ep.error === "offline" ? "Waiting for connection" : `Paused${pct ? ` · ${pct}` : ""}`;
+      return ep.error === "offline"
+        ? t("watch.waitingForConnection")
+        : pct
+          ? t("downloads.pausedPct", { pct })
+          : t("downloads.paused");
     case "error":
-      return ep.error || "Download failed";
+      return ep.error || t("watch.downloadFailed");
   }
 }
 
@@ -51,6 +56,7 @@ export function EpisodeRow({
   onPause: () => void;
   onResume: () => void;
 }) {
+  const { t } = useI18n();
   const posterUrl = useBlobUrl(poster);
   const complete = episode.status === "complete";
   const inFlight = episode.status === "downloading" || episode.status === "queued";
@@ -63,16 +69,16 @@ export function EpisodeRow({
           <img src={posterUrl} alt="" className="h-full w-full object-cover" />
         )}
         <span className="absolute bottom-1 left-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
-          EP.{episode.episodeNumber}
+          {t("common.epShort", { n: episode.episodeNumber })}
         </span>
       </div>
 
       <div className="min-w-0 flex-1 py-1">
         <p className="truncate text-[16px] font-semibold text-text">
-          {episode.name?.trim() || `Episode ${episode.episodeNumber}`}
+          {episode.name?.trim() || t("common.episodeN", { n: episode.episodeNumber })}
         </p>
         <p className={clsx("mt-1 text-[13px]", episode.status === "error" ? "text-crimson" : "text-muted")}>
-          {statusLine(episode)}
+          {statusLine(episode, t)}
         </p>
       </div>
     </>
@@ -81,7 +87,7 @@ export function EpisodeRow({
   const control = editing ? null : complete ? (
     <Link
       href={`/downloads/play?ep=${episode.episodeId}`}
-      aria-label="Play"
+      aria-label={t("common.play")}
       className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-r from-pink to-crimson text-white shadow-[0_8px_18px_-8px_rgb(var(--pink)_/_0.65)]"
     >
       <Play size={16} className="ml-0.5 fill-white" />
@@ -90,7 +96,7 @@ export function EpisodeRow({
     <button
       type="button"
       onClick={inFlight ? onPause : onResume}
-      aria-label={inFlight ? "Pause download" : episode.status === "error" ? "Retry download" : "Resume download"}
+      aria-label={inFlight ? t("watch.pauseDownload") : episode.status === "error" ? t("watch.retryDownload") : t("watch.resumeDownload")}
       className="shrink-0"
     >
       <ProgressRing progress={inFlight && episode.totalBytes === 0 ? -1 : fraction(episode)} size={40}>
@@ -114,7 +120,7 @@ export function EpisodeRow({
           type="button"
           onClick={onToggleSelect}
           aria-pressed={selected}
-          aria-label={`${selected ? "Deselect" : "Select"} episode ${episode.episodeNumber}`}
+          aria-label={t(selected ? "downloads.deselectItem" : "downloads.selectItem", { name: t("common.episodeN", { n: episode.episodeNumber }) })}
           className="flex min-w-0 flex-1 gap-3.5 text-left"
         >
           {content}

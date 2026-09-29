@@ -11,6 +11,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
 
 type Coupon = {
   id: string;
@@ -23,6 +24,7 @@ type Coupon = {
 const supabase = createClient();
 
 export default function TicketsPage() {
+  const { t, lang } = useI18n();
   const { user, loading: authLoading } = useAuth();
   const [coupons, setCoupons] = useState<Coupon[] | null>(null);
 
@@ -41,10 +43,10 @@ export default function TicketsPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/profile" aria-label="Back" className="text-text">
+        <Link href="/profile" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">My Ticket Collection</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("tickets.title")}</h1>
       </div>
 
       {loading ? (
@@ -55,7 +57,7 @@ export default function TicketsPage() {
       ) : coupons.length === 0 ? (
         <div className="mt-16 flex flex-col items-center gap-2 text-center">
           <Ticket size={28} className="text-muted" />
-          <p className="text-[14px] text-muted">No coupons yet — earn them through rewards and offers.</p>
+          <p className="text-[14px] text-muted">{t("tickets.empty")}</p>
         </div>
       ) : (
         <div className="mt-5 space-y-2.5">
@@ -82,8 +84,14 @@ export default function TicketsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-semibold text-text">{c.name}</p>
                   <p className="mt-0.5 text-[12.5px] text-muted">
-                    {c.discount_percent}% off one episode unlock ·{" "}
-                    {spent ? "used" : expired ? "expired" : `expires ${new Date(c.expires_at).toLocaleDateString()}`}
+                    {t("tickets.discountLine", {
+                      pct: c.discount_percent,
+                      status: spent
+                        ? t("tickets.used")
+                        : expired
+                          ? t("tickets.expired")
+                          : t("tickets.expires", { date: new Date(c.expires_at).toLocaleDateString(lang) }),
+                    })}
                   </p>
                 </div>
               </div>
