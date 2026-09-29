@@ -145,6 +145,10 @@ export default function UploadPage() {
 
   const existingTitleId = searchParams.get("titleId");
   const requestedEpisodeId = searchParams.get("episodeId");
+  // A dedicated promo clip isn't part of the 1..N numbering — it's created
+  // with episode_number 0 and flagged is_promo via set_promo_episode below,
+  // reusing this exact same form instead of a parallel upload flow.
+  const isPromoMode = searchParams.get("promo") === "1";
 
   const [step, setStep] = useState<"title" | "episode">(existingTitleId ? "episode" : "title");
   const [titleId, setTitleId] = useState<string | null>(existingTitleId);
@@ -210,6 +214,14 @@ export default function UploadPage() {
         .order("episode_number", { ascending: false });
       if (eps) {
         setUnits(eps as EpisodeRow[]);
+        if (isPromoMode) {
+          // At most one dedicated (episode_number 0) clip per title — edit
+          // it if it already exists, otherwise start a fresh one at 0.
+          const existingPromo = eps.find((e) => e.episode_number === 0);
+          if (existingPromo) loadEpisode(existingPromo as EpisodeRow);
+          else setEpisodeNumber(0);
+          return;
+        }
         const maxNumber = eps.reduce((m, e) => Math.max(m, e.episode_number), 0);
         const requested = requestedEpisodeId ? eps.find((e) => e.id === requestedEpisodeId) : null;
         if (requested) {
@@ -436,6 +448,16 @@ export default function UploadPage() {
       const others = prev.filter((u) => u.id !== row.id);
       return [...others, row as EpisodeRow].sort((a, b) => b.episode_number - a.episode_number);
     });
+
+    if (isPromoMode) {
+      const { data: promoResult, error: promoErr } = await supabase.rpc("set_promo_episode", {
+        p_title_id: titleId,
+        p_episode_id: row.id,
+      });
+      if (promoErr || !promoResult?.ok) {
+        setError(promoErr?.message || promoResult?.error || "Saved, but couldn't set it as the promo episode.");
+      }
+    }
   }
 
   async function handleDeleteEpisode(id: string) {
@@ -499,7 +521,11 @@ export default function UploadPage() {
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-display text-2xl font-semibold text-text">
-          {step === "title" ? "New title" : `Add ${config.unitLabel.toLowerCase()}${titleName ? ` · ${titleName}` : ""}`}
+          {step === "title"
+            ? "New title"
+            : isPromoMode
+              ? `Promo clip${titleName ? ` · ${titleName}` : ""}`
+              : `Add ${config.unitLabel.toLowerCase()}${titleName ? ` · ${titleName}` : ""}`}
         </h1>
       </div>
 
@@ -619,7 +645,7 @@ export default function UploadPage() {
                     className="flex w-full items-center justify-between"
                   >
                     <span className="text-text">
-                      {config.unitLabel} {d.episode_number}
+                      {d.episode_number === 0 ? "Promo clip" : `${config.unitLabel} ${d.episode_number}`}
                       {d.name ? ` · ${d.name}` : ""}
                     </span>
                     <span className="text-[11px] text-muted">
@@ -691,15 +717,21 @@ export default function UploadPage() {
             }}
             className="space-y-3"
           >
-            <input
-              type="number"
-              required
-              min={1}
-              placeholder={`${config.unitLabel} number`}
-              value={episodeNumber}
-              onChange={(e) => setEpisodeNumber(Number(e.target.value))}
-              className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
-            />
+            {isPromoMode ? (
+              <div className="flex h-12 w-full items-center rounded-md border border-dashed border-border bg-surface px-4 text-[14px] text-muted">
+                Promo clip — not part of the numbered {config.unitLabel.toLowerCase()}s
+              </div>
+            ) : (
+              <input
+                type="number"
+                required
+                min={1}
+                placeholder={`${config.unitLabel} number`}
+                value={episodeNumber}
+                onChange={(e) => setEpisodeNumber(Number(e.target.value))}
+                className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
+              />
+            )}
             <input
               placeholder={`${config.unitLabel} name (optional)`}
               value={episodeName}
@@ -781,7 +813,7 @@ export default function UploadPage() {
               </Button>
             </div>
 
-            {justSaved && (
+            {justSaved && !isPromoMode && (
               <Button
                 type="button"
                 onClick={resetForNextUnit}

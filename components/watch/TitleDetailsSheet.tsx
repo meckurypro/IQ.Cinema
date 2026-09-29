@@ -27,6 +27,7 @@ export function TitleDetailsSheet({
   views,
   contentRating,
   posterUrl,
+  similarHref,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +37,10 @@ export function TitleDetailsSheet({
   views: number;
   contentRating?: string | null;
   posterUrl?: string | null;
+  // Default sends a similar-title tap to its title page. For You overrides
+  // this so the tap stays inside the feed with that title's promo playing —
+  // same sheet, different exit ("onion").
+  similarHref?: (t: SimilarTitle) => string;
 }) {
   const supabase = createClient();
   const [tags, setTags] = useState<string[] | null>(null);
@@ -124,7 +129,13 @@ export function TitleDetailsSheet({
           ) : similar.length > 0 ? (
             <div className="flex gap-2.5 overflow-x-auto pb-1">
               {similar.map((t) => (
-                <Link key={t.id} href={`/title/${t.slug}`} replace onClick={() => markSheetNavigating()} className="w-[86px] shrink-0">
+                <Link
+                  key={t.id}
+                  href={similarHref ? similarHref(t) : `/title/${t.slug}`}
+                  replace
+                  onClick={() => markSheetNavigating()}
+                  className="w-[86px] shrink-0"
+                >
                   <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-surface-raised">
                     {t.poster_url && (
                       <Image src={t.poster_url} alt={t.title} fill className="object-cover" />

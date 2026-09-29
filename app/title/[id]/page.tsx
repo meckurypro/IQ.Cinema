@@ -65,6 +65,7 @@ async function getTitle(param: string) {
     .select("id, episode_number, name, unlock_cost_coins")
     .eq("title_id", title.id)
     .eq("status", "published")
+    .gt("episode_number", 0)
     .order("episode_number", { ascending: true });
 
   const { data: settings } = await supabase

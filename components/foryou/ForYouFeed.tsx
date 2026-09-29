@@ -1,0 +1,534 @@
+// components/foryou/ForYouFeed.tsx
+
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { Play, ChevronRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { storyboardPublicUrl } from "@/lib/storyboard";
+import { getDeviceId } from "@/lib/device";
+import { useAuth } from "@/hooks/useAuth";
+import { titlePath } from "@/lib/links";
+import { VideoPlayer } from "@/components/watch/VideoPlayer";
+import { ActionRail } from "@/components/watch/ActionRail";
+import { CommentsSheet } from "@/components/watch/CommentsSheet";
+import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
+import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
+import { ForYouHeader } from "@/components/foryou/ForYouHeader";
+
+type PromoItem = {
+  episode_id: string;
+  episode_number: number;
+  video_url: string | null;
+  thumbnail_url: string | null;
+  duration_seconds: number | null;
+  save_count: number;
+  comment_count: number;
+  share_count: number;
+  title_id: string;
+  slug: string;
+  title: string;
+  synopsis: string | null;
+  poster_url: string | null;
+  content_rating: string | null;
+  category: string | null;
+  tags: string[] | null;
+  total_episodes: number;
+  total_unique_views: number;
+  published_at: string | null;
+};
+
+type Engagement = { saved: boolean; saveCount: number; commentCount: number; shareCount: number };
+
+const PAGE_SIZE = 8;
+
+function engagementFor(item: PromoItem): Engagement {
+  return {
+    saved: false,
+    saveCount: item.save_count ?? 0,
+    commentCount: item.comment_count ?? 0,
+    shareCount: item.share_count ?? 0,
+  };
+}
+
+export function ForYouFeed() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const supabase = createClient();
+
+  const [items, setItems] = useState<PromoItem[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
+  const [engagement, setEngagement] = useState<Record<string, Engagement>>({});
+  const [exhausted, setExhausted] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showComments, setShowComments] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showTray, setShowTray] = useState(false);
+  const [trayTitleId, setTrayTitleId] = useState<string | null>(null);
+  const [trayEpisodes, setTrayEpisodes] = useState<TrayEpisode[]>([]);
+  const [trayFreeCount, setTrayFreeCount] = useState(4);
+  const [trayDefaultCost, setTrayDefaultCost] = useState(30);
+  const [trayUnlockedIds, setTrayUnlockedIds] = useState<Set<string>>(new Set());
+  const [shareToast, setShareToast] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const slideRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const savingRef = useRef<Set<string>>(new Set());
+  const watchedRef = useRef(0);
+  const lastPlayheadRef = useRef<number | null>(null);
+  const lastReportedRef = useRef(0);
+  const injectedSlug = useRef<string | null>(null);
+
+  const seedEngagement = useCallback((batch: PromoItem[]) => {
+    setEngagement((prev) => {
+      const next = { ...prev };
+      for (const it of batch) if (!next[it.episode_id]) next[it.episode_id] = engagementFor(it);
+      return next;
+    });
+  }, []);
+
+  // First page.
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.rpc("get_for_you_feed", { p_limit: PAGE_SIZE, p_before: null });
+      const batch = (data as PromoItem[]) ?? [];
+      setItems(batch);
+      if (batch[0]) setActiveId(batch[0].episode_id);
+      seedEngagement(batch);
+      if (batch.length < PAGE_SIZE) setExhausted(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A "Similar titles" tap from inside the details sheet lands here as
+  // ?title=<slug> — fetch just that title's promo, splice it in right after
+  // the current slide, and scroll to it. Same sheet, feed keeps going.
+  useEffect(() => {
+    const slug = searchParams.get("title");
+    if (!slug || slug === injectedSlug.current || !items) return;
+    injectedSlug.current = slug;
+    (async () => {
+      const { data } = await supabase.rpc("get_for_you_promo_by_slug", { p_slug: slug });
+      const row = (Array.isArray(data) ? data[0] : data) as PromoItem | undefined;
+      if (!row) return;
+      setItems((prev) => {
+        const cur = prev ?? [];
+        const already = cur.find((i) => i.episode_id === row.episode_id);
+        if (already) return cur;
+        const idx = cur.findIndex((i) => i.episode_id === activeId);
+        const next = [...cur];
+        next.splice(idx >= 0 ? idx + 1 : cur.length, 0, row);
+        return next;
+      });
+      seedEngagement([row]);
+      setActiveId(row.episode_id);
+      requestAnimationFrame(() => {
+        slideRefs.current.get(row.episode_id)?.scrollIntoView({ block: "start" });
+      });
+      router.replace("/for-you", { scroll: false });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, items]);
+
+  // Signed URL for the active slide + its immediate neighbors.
+  useEffect(() => {
+    if (!items || !activeId) return;
+    const idx = items.findIndex((i) => i.episode_id === activeId);
+    if (idx < 0) return;
+    const targets = [items[idx - 1], items[idx], items[idx + 1]].filter(
+      (i): i is PromoItem => !!i && !!i.video_url && !videoUrls[i.episode_id]
+    );
+    if (!targets.length) return;
+    let ignore = false;
+    (async () => {
+      const entries = await Promise.all(
+        targets.map(async (it) => {
+          const { data } = await supabase.storage.from("videos").createSignedUrl(it.video_url!, 60 * 60);
+          return [it.episode_id, data?.signedUrl] as const;
+        })
+      );
+      if (ignore) return;
+      setVideoUrls((prev) => {
+        const next = { ...prev };
+        for (const [id, url] of entries) if (url) next[id] = url;
+        return next;
+      });
+    })();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, items, supabase]);
+
+  const refreshVideoUrl = useCallback(
+    async (episodeId: string) => {
+      const it = items?.find((i) => i.episode_id === episodeId);
+      if (!it?.video_url) return undefined;
+      const { data } = await supabase.storage.from("videos").createSignedUrl(it.video_url, 60 * 60);
+      if (data?.signedUrl) setVideoUrls((prev) => ({ ...prev, [episodeId]: data.signedUrl }));
+      return data?.signedUrl;
+    },
+    [items, supabase]
+  );
+
+  // Which slide is active, and — once we're within two of the end —
+  // whether to fetch the next page.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !items?.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            const id = entry.target.getAttribute("data-episode-id");
+            if (id) setActiveId(id);
+          }
+        }
+      },
+      { root: container, threshold: [0.6] }
+    );
+    for (const el of slideRefs.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, [items]);
+
+  useEffect(() => {
+    if (!items || !activeId || exhausted || loadingMore) return;
+    const idx = items.findIndex((i) => i.episode_id === activeId);
+    if (idx < items.length - 2) return;
+    setLoadingMore(true);
+    const cursor = items[items.length - 1]?.published_at ?? null;
+    supabase
+      .rpc("get_for_you_feed", { p_limit: PAGE_SIZE, p_before: cursor })
+      .then(({ data }) => {
+        const batch = (data as PromoItem[]) ?? [];
+        const existing = new Set(items.map((i) => i.episode_id));
+        const fresh = batch.filter((i) => !existing.has(i.episode_id));
+        if (fresh.length) {
+          setItems((prev) => [...(prev ?? []), ...fresh]);
+          seedEngagement(fresh);
+        }
+        if (batch.length < PAGE_SIZE) setExhausted(true);
+        setLoadingMore(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, items, exhausted, loadingMore]);
+
+  useEffect(() => {
+    watchedRef.current = 0;
+    lastPlayheadRef.current = null;
+    lastReportedRef.current = 0;
+  }, [activeId]);
+
+  function reportProgress(item: PromoItem, playhead: number, force = false) {
+    const prev = lastPlayheadRef.current;
+    lastPlayheadRef.current = playhead;
+    if (prev !== null) {
+      const delta = playhead - prev;
+      if (delta > 0 && delta <= 1.5) watchedRef.current += delta;
+    }
+    if (!force && watchedRef.current - lastReportedRef.current < 10) return;
+    if (force && watchedRef.current === lastReportedRef.current) return;
+    lastReportedRef.current = watchedRef.current;
+
+    supabase
+      .rpc("record_play", {
+        p_user_id: user?.id ?? null,
+        p_device_id: getDeviceId(),
+        p_episode_id: item.episode_id,
+        p_watched_seconds: Math.floor(watchedRef.current),
+      })
+      .then(({ error: playErr }) => {
+        if (playErr) console.error("record_play failed", playErr.message);
+      });
+  }
+
+  function goToNext(item: PromoItem) {
+    if (!items) return;
+    const idx = items.findIndex((i) => i.episode_id === item.episode_id);
+    const nextEl = items[idx + 1] && slideRefs.current.get(items[idx + 1].episode_id);
+    nextEl?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  async function toggleSave(item: PromoItem) {
+    if (!user) return router.push("/auth/login");
+    if (savingRef.current.has(item.episode_id)) return;
+    savingRef.current.add(item.episode_id);
+    const current = engagement[item.episode_id];
+    const next = !current?.saved;
+    setEngagement((prev) => ({
+      ...prev,
+      [item.episode_id]: {
+        ...prev[item.episode_id],
+        saved: next,
+        saveCount: Math.max(0, (prev[item.episode_id]?.saveCount ?? 0) + (next ? 1 : -1)),
+      },
+    }));
+    let failed = false;
+    try {
+      const { error: err } = next
+        ? await supabase
+            .from("episode_saves")
+            .upsert(
+              { user_id: user.id, episode_id: item.episode_id },
+              { onConflict: "user_id,episode_id", ignoreDuplicates: true }
+            )
+        : await supabase.from("episode_saves").delete().eq("user_id", user.id).eq("episode_id", item.episode_id);
+      failed = !!err;
+    } catch {
+      failed = true;
+    } finally {
+      savingRef.current.delete(item.episode_id);
+    }
+    if (failed) {
+      setEngagement((prev) => ({
+        ...prev,
+        [item.episode_id]: {
+          ...prev[item.episode_id],
+          saved: !next,
+          saveCount: Math.max(0, (prev[item.episode_id]?.saveCount ?? 0) + (next ? -1 : 1)),
+        },
+      }));
+    }
+  }
+
+  async function handleShare(item: PromoItem) {
+    const url = typeof window !== "undefined" ? `${window.location.origin}${titlePath(item.slug)}` : "";
+    const { data } = await supabase.rpc("record_episode_share", { p_episode_id: item.episode_id });
+    setEngagement((prev) => ({
+      ...prev,
+      [item.episode_id]: {
+        ...prev[item.episode_id],
+        shareCount: data?.ok ? data.share_count : (prev[item.episode_id]?.shareCount ?? 0) + 1,
+      },
+    }));
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: item.title, url });
+        return;
+      } catch {
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 1800);
+    } catch {
+      // no-op
+    }
+  }
+
+  async function openTray(item: PromoItem) {
+    setShowTray(true);
+    if (trayTitleId === item.title_id) return;
+    setTrayTitleId(item.title_id);
+    setTrayEpisodes([]);
+    setTrayUnlockedIds(new Set());
+    const [{ data: eps }, { data: t }, { data: settings }] = await Promise.all([
+      supabase
+        .from("episodes")
+        .select("id, episode_number, name, unlock_cost_coins")
+        .eq("title_id", item.title_id)
+        .eq("status", "published")
+        .gt("episode_number", 0)
+        .order("episode_number", { ascending: true }),
+      supabase.from("titles").select("free_episode_count").eq("id", item.title_id).single(),
+      supabase.from("platform_settings").select("default_free_episodes, default_episode_unlock_coins").single(),
+    ]);
+    setTrayEpisodes((eps as TrayEpisode[]) ?? []);
+    setTrayFreeCount(t?.free_episode_count ?? settings?.default_free_episodes ?? 4);
+    setTrayDefaultCost(settings?.default_episode_unlock_coins ?? 30);
+    const ids = (eps ?? []).map((e) => e.id);
+    if (user && ids.length) {
+      const { data: unlocks } = await supabase
+        .from("episode_unlocks")
+        .select("episode_id")
+        .eq("user_id", user.id)
+        .in("episode_id", ids);
+      setTrayUnlockedIds(new Set((unlocks ?? []).map((u) => u.episode_id)));
+    }
+  }
+
+  if (!items) {
+    return <div className="h-[calc(100dvh-5rem)] bg-black" />;
+  }
+
+  const active = items.find((i) => i.episode_id === activeId) ?? items[0];
+
+  return (
+    <div className="relative h-[calc(100dvh-5rem)] w-full overflow-hidden bg-black">
+      <ForYouHeader />
+      <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
+        {items.map((item) => {
+          const isActive = item.episode_id === activeId;
+          const eng = engagement[item.episode_id];
+          const isExpanded = expanded.has(item.episode_id);
+          const epLabel = item.total_episodes > 0 ? `EP.${Math.max(item.episode_number, 1)}/EP.${item.total_episodes}` : null;
+
+          return (
+            <div
+              key={item.episode_id}
+              ref={(el) => {
+                if (el) slideRefs.current.set(item.episode_id, el);
+                else slideRefs.current.delete(item.episode_id);
+              }}
+              data-episode-id={item.episode_id}
+              className="relative h-full w-full snap-start"
+            >
+              {isActive ? (
+                <VideoPlayer
+                  src={videoUrls[item.episode_id]}
+                  autoPlay
+                  posterUrl={item.thumbnail_url ?? item.poster_url ?? undefined}
+                  onRequestFreshSrc={() => refreshVideoUrl(item.episode_id)}
+                  storyboardUrl={item.video_url ? storyboardPublicUrl(supabase, item.video_url) : null}
+                  onTimeUpdate={(t) => reportProgress(item, t)}
+                  onEnded={() => {
+                    reportProgress(item, item.duration_seconds ?? lastPlayheadRef.current ?? 0, true);
+                    goToNext(item);
+                  }}
+                  actionRail={
+                    <ActionRail
+                      saved={eng?.saved ?? false}
+                      saveCount={eng?.saveCount ?? item.save_count}
+                      onToggleSave={() => toggleSave(item)}
+                      commentCount={eng?.commentCount ?? item.comment_count}
+                      onOpenComments={() => setShowComments(true)}
+                      shareCount={eng?.shareCount ?? item.share_count}
+                      onShare={() => handleShare(item)}
+                      onOpenEpisodes={() => openTray(item)}
+                    />
+                  }
+                />
+              ) : (
+                // Not the active slide: a static frame only, so only one
+                // video ever decodes/plays at a time.
+                <div className="relative h-full w-full bg-black">
+                  {(item.thumbnail_url ?? item.poster_url) && (
+                    <Image src={(item.thumbnail_url ?? item.poster_url)!} alt="" fill className="object-cover opacity-70" />
+                  )}
+                </div>
+              )}
+
+              {/* Title / tags / synopsis / Watch Full Drama — sits above
+                  VideoPlayer's own progress bar, below the action rail. */}
+              <div
+                className="pointer-events-none absolute inset-x-4 z-20 flex flex-col gap-2"
+                style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 56px)" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(true)}
+                  className="pointer-events-auto flex max-w-[78%] items-center gap-1 text-left"
+                >
+                  <span className="truncate font-display text-[17px] font-semibold text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]">
+                    {item.title}
+                  </span>
+                  <ChevronRight size={16} className="shrink-0 text-white/80" />
+                </button>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(item.tags ?? []).slice(0, 2).map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                  {epLabel && <span className="text-[12px] font-semibold text-white/80">{epLabel}</span>}
+                </div>
+
+                {item.synopsis && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpanded((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(item.episode_id)) next.delete(item.episode_id);
+                        else next.add(item.episode_id);
+                        return next;
+                      })
+                    }
+                    className="pointer-events-auto max-w-[86%] text-left text-[13px] leading-snug text-white/80 [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
+                  >
+                    <span className={isExpanded ? "" : "line-clamp-2"}>{item.synopsis}</span>{" "}
+                    {!isExpanded && <span className="font-semibold text-white">More</span>}
+                  </button>
+                )}
+
+                <Link
+                  href={titlePath(item.slug)}
+                  className="pointer-events-auto mt-1 flex h-11 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-pink to-crimson text-[15px] font-semibold text-white shadow-[0_10px_24px_-10px_rgb(var(--pink)_/_0.65)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] active:brightness-95"
+                >
+                  <Play size={16} className="fill-white" />
+                  Watch Full Drama
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+
+        {!items.length && (
+          <div className="flex h-full items-center justify-center px-8 text-center">
+            <p className="text-[14px] text-white/70">
+              Nothing on For You yet — check back once creators have set a promo episode.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {shareToast && (
+        <div className="absolute inset-x-0 bottom-28 z-30 flex justify-center">
+          <span className="rounded-full bg-black/70 px-3.5 py-1.5 text-[12px] font-medium text-white">
+            Link copied
+          </span>
+        </div>
+      )}
+
+      {active && (
+        <>
+          <CommentsSheet
+            open={showComments}
+            onClose={() => setShowComments(false)}
+            episodeId={active.episode_id}
+            count={engagement[active.episode_id]?.commentCount ?? active.comment_count}
+            onCountChange={(n) =>
+              setEngagement((prev) => ({
+                ...prev,
+                [active.episode_id]: { ...prev[active.episode_id], commentCount: n },
+              }))
+            }
+          />
+
+          <EpisodeTray
+            open={showTray}
+            onClose={() => setShowTray(false)}
+            episodes={trayEpisodes}
+            freeCount={trayFreeCount}
+            unlockedIds={trayUnlockedIds}
+            defaultCost={trayDefaultCost}
+          />
+
+          <TitleDetailsSheet
+            open={showDetails}
+            onClose={() => setShowDetails(false)}
+            titleId={active.title_id}
+            title={active.title}
+            synopsis={active.synopsis}
+            views={active.total_unique_views}
+            contentRating={active.content_rating}
+            posterUrl={active.poster_url}
+            similarHref={(t) => `/for-you?title=${t.slug}`}
+          />
+        </>
+      )}
+    </div>
+  );
+}
