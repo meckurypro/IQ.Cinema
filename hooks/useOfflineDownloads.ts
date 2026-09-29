@@ -47,7 +47,9 @@ export function useOfflineDownloads() {
         title,
         episodes,
         completeCount: episodes.filter((e) => e.status === "complete").length,
-        activeCount: episodes.filter((e) => e.status === "downloading" || e.status === "queued").length,
+        activeCount: episodes.filter(
+          (e) => e.status === "downloading" || e.status === "queued" || e.status === "processing"
+        ).length,
         lastAdded: Math.max(...episodes.map((e) => e.addedAt)),
       });
     }

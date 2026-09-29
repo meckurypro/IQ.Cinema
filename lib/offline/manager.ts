@@ -8,18 +8,22 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   clearEpisodeChunks,
+  clearStagingChunks,
   deleteEpisode,
   deleteTitle,
   getAllEpisodes,
   getAllTitles,
   offlineStorageSupported,
+  promoteStagingChunks,
   putChunkAndProgress,
   putEpisode,
+  putStagingChunk,
   putTitle,
   readEpisodeBlob,
   type OfflineEpisode,
   type OfflineTitle,
 } from "./db";
+import { watermarkVideo, WatermarkUnsupportedError } from "./watermark";
 
 const CHUNK_BYTES = 4 * 1024 * 1024;
 const MAX_ACTIVE = 2;
@@ -124,10 +128,17 @@ class OfflineManager {
     }
     try {
       const [titles, episodes] = await Promise.all([getAllTitles(effective), getAllEpisodes(effective)]);
-      // Anything that was mid-flight when the tab died is resumable, not lost.
-      const settled = episodes.map((e) =>
-        e.status === "downloading" || e.status === "queued" ? { ...e, status: "paused" as const } : e
-      );
+      // Anything that was mid-flight when the tab died is resumable, not
+      // lost. A dead "processing" episode already has a complete, playable
+      // original download sitting untouched (the watermark re-encode only
+      // ever swaps it out once fully staged) — see finalize() — so it just
+      // becomes "complete" without its burned-in watermark rather than
+      // getting treated as an interrupted network download.
+      const settled = episodes.map((e) => {
+        if (e.status === "downloading" || e.status === "queued") return { ...e, status: "paused" as const };
+        if (e.status === "processing") return { ...e, status: "complete" as const, processProgress: undefined };
+        return e;
+      });
       this.set({ ready: true, userId: effective, titles, episodes: settled });
       if (navigator.onLine) this.pump();
     } catch {
@@ -340,16 +351,7 @@ class OfflineManager {
 
       if (total > 0 && received < total) throw new Error("Connection dropped");
 
-      const finished: OfflineEpisode = {
-        ...ep,
-        totalBytes: total || received,
-        receivedBytes: received,
-        status: "complete",
-        error: null,
-        completedAt: Date.now(),
-      };
-      await putEpisode(finished);
-      this.patch(episodeId, finished, true);
+      await this.finalize(episodeId, { ...ep, totalBytes: total || received, receivedBytes: received });
     } catch (err) {
       const reason = controller.signal.reason;
       if (controller.signal.aborted && (reason === "remove" || reason === "pause")) {
@@ -371,6 +373,65 @@ class OfflineManager {
     } finally {
       this.controllers.delete(episodeId);
       this.pump();
+    }
+  }
+
+  // The video is fully downloaded — now burn the watermark into it before
+  // calling it "complete". The re-encoded output is written to a staging
+  // area first and only swapped in once every chunk of it is confirmed on
+  // disk (see promoteStagingChunks), so a crash or quota error mid-encode
+  // leaves the original, still-playable download untouched.
+  //
+  // Best-effort by design: if this browser can't run the WASM encoder, or
+  // the encode/promote step fails for any reason, the viewer still ends up
+  // with a playable offline copy rather than losing the download over it —
+  // it just won't carry the burned-in mark, same as before this feature
+  // existed.
+  private async finalize(episodeId: string, downloaded: OfflineEpisode) {
+    // Persisted (not just in-memory): if the tab dies mid-encode, init()
+    // recognizes "processing" on restart and falls back to the already-
+    // complete original bytes rather than misreading it as an interrupted
+    // download and trying to re-fetch a file that finished long ago.
+    await putEpisode({ ...downloaded, status: "processing" });
+    this.patch(episodeId, { status: "processing", processProgress: 0 }, true);
+    try {
+      const rawBlob = await readEpisodeBlob(episodeId, downloaded.chunkCount);
+      if (!rawBlob) throw new Error("Downloaded video missing from storage");
+
+      const watermarked = await watermarkVideo(rawBlob, (p) =>
+        this.patch(episodeId, { processProgress: p })
+      );
+
+      const chunks = chunkBlob(watermarked, CHUNK_BYTES);
+      for (let i = 0; i < chunks.length; i++) await putStagingChunk(episodeId, i, chunks[i]);
+      await promoteStagingChunks(episodeId, chunks.length);
+
+      const finished: OfflineEpisode = {
+        ...downloaded,
+        receivedBytes: watermarked.size,
+        totalBytes: watermarked.size,
+        chunkCount: chunks.length,
+        status: "complete",
+        error: null,
+        completedAt: Date.now(),
+        processProgress: undefined,
+      };
+      await putEpisode(finished);
+      this.patch(episodeId, finished, true);
+    } catch (err) {
+      if (!(err instanceof WatermarkUnsupportedError)) {
+        console.error("watermark encode failed, keeping unwatermarked download", err);
+      }
+      await clearStagingChunks(episodeId).catch(() => {});
+      const finished: OfflineEpisode = {
+        ...downloaded,
+        status: "complete",
+        error: null,
+        completedAt: Date.now(),
+        processProgress: undefined,
+      };
+      await putEpisode(finished);
+      this.patch(episodeId, finished, true);
     }
   }
 
@@ -399,6 +460,14 @@ function totalFromResponse(res: Response, offset: number) {
   if (m) return Number(m[1]);
   const len = Number(res.headers.get("Content-Length") ?? 0);
   return len > 0 ? len + (res.status === 206 ? offset : 0) : 0;
+}
+
+function chunkBlob(blob: Blob, size: number): Blob[] {
+  const chunks: Blob[] = [];
+  for (let offset = 0; offset < blob.size; offset += size) {
+    chunks.push(blob.slice(offset, Math.min(offset + size, blob.size), blob.type));
+  }
+  return chunks.length ? chunks : [blob];
 }
 
 async function fetchBlob(url: string | null): Promise<Blob | null> {
