@@ -80,9 +80,13 @@ export function EpisodeRow({
   );
 
   const control = editing ? null : complete ? (
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-r from-pink to-crimson text-white shadow-[0_8px_18px_-8px_rgb(var(--pink)_/_0.65)]">
+    <Link
+      href={`/downloads/play?ep=${episode.episodeId}`}
+      aria-label="Play"
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-r from-pink to-crimson text-white shadow-[0_8px_18px_-8px_rgb(var(--pink)_/_0.65)]"
+    >
       <Play size={16} className="ml-0.5 fill-white" />
-    </span>
+    </Link>
   ) : processing ? (
     // Not interactive — there's no network transfer to pause/resume here,
     // just a local encode running to completion.
