@@ -8,7 +8,7 @@ import Image from "next/image";
 import { Lock, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
-import { getDeviceId } from "@/lib/device";
+import { reportPlay } from "@/lib/reportPlay";
 import { useOfflineDownloads } from "@/hooks/useOfflineDownloads";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -364,16 +364,11 @@ export function EpisodeFeed({
     if (force && watchedRef.current === lastReportedRef.current) return;
     lastReportedRef.current = watchedRef.current;
 
-    supabase
-      .rpc("record_play", {
-        p_user_id: user?.id ?? null,
-        p_device_id: getDeviceId(),
-        p_episode_id: episode.id,
-        p_watched_seconds: Math.floor(watchedRef.current),
-      })
-      .then(({ error: playErr }) => {
-        if (playErr) console.error("record_play failed", playErr.message);
-      });
+    void reportPlay(supabase, {
+      userId: user?.id ?? null,
+      episodeId: episode.id,
+      watchedSeconds: watchedRef.current,
+    });
 
     if (user) {
       const completed = episode.duration_seconds ? playhead >= episode.duration_seconds * 0.9 : false;

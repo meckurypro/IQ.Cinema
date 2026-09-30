@@ -8,7 +8,7 @@ import Image from "next/image";
 import { Play, ChevronRight, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { storyboardPublicUrl } from "@/lib/storyboard";
-import { getDeviceId } from "@/lib/device";
+import { reportPlay } from "@/lib/reportPlay";
 import { useAuth } from "@/hooks/useAuth";
 import { titlePath } from "@/lib/links";
 import { formatCount } from "@/lib/format";
@@ -345,16 +345,11 @@ export function ForYouFeed() {
     if (force && watchedRef.current === lastReportedRef.current) return;
     lastReportedRef.current = watchedRef.current;
 
-    supabase
-      .rpc("record_play", {
-        p_user_id: user?.id ?? null,
-        p_device_id: getDeviceId(),
-        p_episode_id: item.episode_id,
-        p_watched_seconds: Math.floor(watchedRef.current),
-      })
-      .then(({ error: playErr }) => {
-        if (playErr) console.error("record_play failed", playErr.message);
-      });
+    void reportPlay(supabase, {
+      userId: user?.id ?? null,
+      episodeId: item.episode_id,
+      watchedSeconds: watchedRef.current,
+    });
   }
 
   function goToNext(item: PromoItem) {
