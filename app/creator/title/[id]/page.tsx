@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type TitleStatus =
   | "draft"
@@ -25,14 +27,22 @@ type TitleStatus =
   | "rejected"
   | "withdrawn";
 
-const STATUS_META: Record<TitleStatus, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-surface-raised text-muted" },
-  in_review: { label: "In review", className: "bg-gold-soft text-gold" },
-  published: { label: "Live", className: "bg-emerald-600/15 text-emerald-500" },
-  coming_soon: { label: "Coming soon", className: "bg-gold-soft text-gold" },
-  suspended: { label: "Suspended", className: "bg-crimson-soft text-crimson" },
-  rejected: { label: "Rejected", className: "bg-crimson-soft text-crimson" },
-  withdrawn: { label: "Withdrawn", className: "bg-surface-raised text-muted" },
+const STATUS_META: Record<TitleStatus, { labelKey: MessageKey; className: string }> = {
+  draft: { labelKey: "creator.status.draft", className: "bg-surface-raised text-muted" },
+  in_review: { labelKey: "creator.status.in_review", className: "bg-gold-soft text-gold" },
+  published: { labelKey: "creator.status.published", className: "bg-emerald-600/15 text-emerald-500" },
+  coming_soon: { labelKey: "creator.status.coming_soon", className: "bg-gold-soft text-gold" },
+  suspended: { labelKey: "creator.status.suspended", className: "bg-crimson-soft text-crimson" },
+  rejected: { labelKey: "creator.status.rejected", className: "bg-crimson-soft text-crimson" },
+  withdrawn: { labelKey: "creator.status.withdrawn", className: "bg-surface-raised text-muted" },
+};
+
+// Episode-level statuses reuse the upload page's labels.
+const EP_STATUS_KEY: Record<string, MessageKey> = {
+  draft: "upload.status.draft",
+  processing: "upload.status.processing",
+  published: "upload.status.published",
+  suspended: "upload.status.suspended",
 };
 
 type TitleRow = {
@@ -62,13 +72,11 @@ type EpisodeRow = {
   is_promo: boolean;
 };
 
-const UNIT_LABEL: Record<string, string> = {
-  short_episode: "Episode",
-  full_episode: "Episode",
-  one_part_film: "Part",
-};
+const unitOf = (contentType: string | undefined): "episode" | "part" =>
+  contentType === "one_part_film" ? "part" : "episode";
 
 export default function ManageTitlePage() {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
@@ -163,7 +171,7 @@ export default function ManageTitlePage() {
     if (updErr) {
       setError(
         updErr.code === "23505"
-          ? "A title with this name already exists. Titles must be unique, so please choose a different name."
+          ? t("upload.err.titleExists")
           : updErr.message
       );
       return;
@@ -183,8 +191,8 @@ export default function ManageTitlePage() {
     if (rpcErr || !data?.ok) {
       const reason =
         data?.error === "no_video"
-          ? `Finalize at least one ${(UNIT_LABEL[title?.content_type ?? ""] ?? "episode").toLowerCase()} (not just save as draft) before submitting.`
-          : rpcErr?.message || data?.error || "Could not submit for review.";
+          ? t(unitOf(title?.content_type) === "part" ? "manage.err.noVideo.part" : "manage.err.noVideo.episode")
+          : rpcErr?.message || data?.error || t("manage.err.submit");
       setError(reason);
       return;
     }
@@ -197,7 +205,7 @@ export default function ManageTitlePage() {
     const { data, error: rpcErr } = await supabase.rpc("withdraw_title", { p_title_id: id });
     setActionBusy(null);
     if (rpcErr || !data?.ok) {
-      setError(rpcErr?.message || data?.error || "Could not withdraw project.");
+      setError(rpcErr?.message || data?.error || t("manage.err.withdraw"));
       return;
     }
     load();
@@ -212,7 +220,7 @@ export default function ManageTitlePage() {
     });
     setActionBusy(null);
     if (rpcErr || !data?.ok) {
-      setError(rpcErr?.message || data?.error || "Could not set promo episode.");
+      setError(rpcErr?.message || data?.error || t("manage.err.promo"));
       return;
     }
     load();
@@ -230,12 +238,14 @@ export default function ManageTitlePage() {
   if (!title || (user && title.creator_id !== user.id)) {
     return (
       <div className="fade-in px-4 pt-5 pb-10">
-        <p className="text-center text-sm text-muted">Project not found.</p>
+        <p className="text-center text-sm text-muted">{t("manage.notFound")}</p>
       </div>
     );
   }
 
-  const unitLabel = UNIT_LABEL[title.content_type] ?? "Episode";
+  const unit = unitOf(title.content_type);
+  const isPart = unit === "part";
+  const unitN = (n: number) => t(isPart ? "upload.partN" : "common.episodeN", { n });
   const numberedEpisodes = episodes.filter((e) => e.episode_number > 0);
   const promoClip = episodes.find((e) => e.episode_number === 0) ?? null;
   // Only an episode that's been finalized (sent into the transcode
@@ -250,7 +260,7 @@ export default function ManageTitlePage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/creator/dashboard" aria-label="Back" className="text-text">
+        <Link href="/creator/dashboard" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="min-w-0 flex-1 truncate font-display text-2xl font-semibold text-text">
@@ -260,7 +270,7 @@ export default function ManageTitlePage() {
 
       <div className="mt-3 flex items-center gap-2">
         <span className={clsx("rounded-full px-2.5 py-1 text-[11px] font-semibold", meta.className)}>
-          {meta.label}
+          {t(meta.labelKey)}
         </span>
         {title.content_rating && (
           <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted">
@@ -272,13 +282,13 @@ export default function ManageTitlePage() {
 
       {title.status === "rejected" && title.admin_review_note && (
         <div className="mt-3 rounded-md border border-crimson/30 bg-crimson-soft px-4 py-3 text-[13px] text-crimson">
-          <p className="font-semibold">Declined by admin</p>
+          <p className="font-semibold">{t("manage.declined")}</p>
           <p className="mt-0.5">{title.admin_review_note}</p>
         </div>
       )}
       {title.review_ignored_at && title.status === "in_review" && (
         <div className="mt-3 rounded-md border border-gold/30 bg-gold-soft px-4 py-3 text-[13px] text-gold">
-          Still under review — an admin looked at this and will follow up.
+          {t("manage.stillInReview")}
         </div>
       )}
 
@@ -290,18 +300,18 @@ export default function ManageTitlePage() {
             size="sm"
             disabled={actionBusy !== null || !hasFinalizedEpisode}
             onClick={submitForReview}
-            title={!hasFinalizedEpisode ? `Finalize a ${unitLabel.toLowerCase()} first` : undefined}
+            title={!hasFinalizedEpisode ? t(isPart ? "manage.finalizeFirst.part" : "manage.finalizeFirst.episode") : undefined}
           >
-            {actionBusy === "submit" ? "Submitting…" : "Submit for admin review"}
+            {actionBusy === "submit" ? t("creator.submitting") : t("manage.submitForReview")}
           </Button>
         )}
         {canWithdraw && (
           <Button size="sm" variant="secondary" disabled={actionBusy !== null} onClick={withdraw}>
-            {actionBusy === "withdraw" ? "Withdrawing…" : "Withdraw / take down"}
+            {actionBusy === "withdraw" ? t("manage.withdrawing") : t("manage.withdraw")}
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={() => setEditing((v) => !v)}>
-          <Pencil size={13} /> {editing ? "Cancel edit" : "Edit details"}
+          <Pencil size={13} /> {editing ? t("manage.cancelEdit") : t("manage.editDetails")}
         </Button>
       </div>
 
@@ -310,18 +320,18 @@ export default function ManageTitlePage() {
           <input
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Title"
+            placeholder={t("upload.titlePlaceholder")}
             className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
           />
           <select
             value={editCategory}
             onChange={(e) => setEditCategory(e.target.value as Category)}
-            aria-label="Category"
+            aria-label={t("library.category")}
             className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
-                {c.label}
+                {t(c.labelKey)}
               </option>
             ))}
           </select>
@@ -330,7 +340,7 @@ export default function ManageTitlePage() {
             onChange={(e) => setEditGenre(e.target.value)}
             className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
           >
-            <option value="">No genre</option>
+            <option value="">{t("manage.noGenre")}</option>
             {genres.map((g) => (
               <option key={g} value={g}>
                 {g}
@@ -344,7 +354,7 @@ export default function ManageTitlePage() {
           >
             {CONTENT_RATINGS.map((r) => (
               <option key={r.value} value={r.value}>
-                {r.label}
+                {t(r.labelKey)}
               </option>
             ))}
           </select>
@@ -352,11 +362,11 @@ export default function ManageTitlePage() {
             value={editSynopsis}
             onChange={(e) => setEditSynopsis(e.target.value)}
             rows={3}
-            placeholder="Synopsis"
+            placeholder={t("upload.synopsis")}
             className="w-full rounded-md border border-border bg-bg px-4 py-3 text-[14px] text-text"
           />
           <label className="flex h-12 w-full cursor-pointer items-center justify-between rounded-md border border-dashed border-border bg-bg px-4 text-[13px] text-muted">
-            {editPosterFile ? editPosterFile.name : "Replace poster (optional)"}
+            {editPosterFile ? editPosterFile.name : t("manage.replacePoster")}
             <Upload size={15} />
             <input
               type="file"
@@ -366,16 +376,16 @@ export default function ManageTitlePage() {
             />
           </label>
           <Button className="w-full" disabled={savingDetails} onClick={saveDetails}>
-            {savingDetails ? "Saving…" : "Save changes"}
+            {savingDetails ? t("upload.saving") : t("manage.saveChanges")}
           </Button>
         </div>
       )}
 
       <div className="mt-7 flex items-center justify-between">
-        <h2 className="font-display text-[17px] font-semibold text-text">{unitLabel}s</h2>
+        <h2 className="font-display text-[17px] font-semibold text-text">{t(isPart ? "manage.unitHeading.part" : "manage.unitHeading.episode")}</h2>
         <Link href={`/creator/upload?titleId=${title.id}`}>
           <Button size="sm" variant="secondary">
-            <Plus size={14} /> Add {unitLabel.toLowerCase()}
+            <Plus size={14} /> {t(isPart ? "upload.addUnit.part" : "upload.addUnit.episode")}
           </Button>
         </Link>
       </div>
@@ -389,18 +399,18 @@ export default function ManageTitlePage() {
             >
               <div>
                 <p className="text-[14px] font-medium text-text">
-                  {unitLabel} {ep.episode_number}
+                  {unitN(ep.episode_number)}
                   {ep.name ? ` · ${ep.name}` : ""}
                 </p>
-                <p className="mt-0.5 text-[12px] capitalize text-muted">{ep.status}</p>
+                <p className="mt-0.5 text-[12px] capitalize text-muted">{EP_STATUS_KEY[ep.status] ? t(EP_STATUS_KEY[ep.status]) : ep.status}</p>
               </div>
-              <span className="text-[12px] text-pink">Edit</span>
+              <span className="text-[12px] text-pink">{t("manage.edit")}</span>
             </Link>
           </li>
         ))}
         {!numberedEpisodes.length && (
           <li className="px-4 py-6 text-center text-sm text-muted">
-            No {unitLabel.toLowerCase()}s yet.
+            {t(isPart ? "manage.noUnits.part" : "manage.noUnits.episode")}
           </li>
         )}
       </ul>
@@ -410,11 +420,10 @@ export default function ManageTitlePage() {
           uploaded outside the 1..N numbering — same underlying table, no
           separate structure. */}
       <div className="mt-7 flex items-center justify-between">
-        <h2 className="font-display text-[17px] font-semibold text-text">Promo episode</h2>
+        <h2 className="font-display text-[17px] font-semibold text-text">{t("manage.promoEpisode")}</h2>
       </div>
       <p className="mt-1 text-[12px] text-muted">
-        Shown on the For You feed with this title's tags and category. Pick a published{" "}
-        {unitLabel.toLowerCase()}, or use a dedicated clip that isn't one of the numbered ones.
+        {t(isPart ? "manage.promoHint.part" : "manage.promoHint.episode")}
       </p>
 
       <ul className="mt-2.5 divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
@@ -422,15 +431,15 @@ export default function ManageTitlePage() {
           <li className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-[14px] font-medium text-text">
-                Dedicated promo clip{promoClip.name ? ` · ${promoClip.name}` : ""}
+                {t("manage.dedicatedPromoClip")}{promoClip.name ? ` · ${promoClip.name}` : ""}
               </p>
               <p className="mt-0.5 text-[12px] capitalize text-muted">
-                {promoClip.status}
-                {promoClip.is_promo ? " · Currently the promo" : ""}
+                {EP_STATUS_KEY[promoClip.status] ? t(EP_STATUS_KEY[promoClip.status]) : promoClip.status}
+                {promoClip.is_promo ? t("manage.currentlyPromo") : ""}
               </p>
             </div>
             <Link href={`/creator/upload?titleId=${title.id}&promo=1`} className="text-[12px] text-pink">
-              Edit
+              {t("manage.edit")}
             </Link>
           </li>
         )}
@@ -438,31 +447,31 @@ export default function ManageTitlePage() {
           <li key={ep.id} className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-[14px] font-medium text-text">
-                {unitLabel} {ep.episode_number}
+                {unitN(ep.episode_number)}
                 {ep.name ? ` · ${ep.name}` : ""}
               </p>
               {ep.is_promo && (
-                <p className="mt-0.5 text-[12px] font-semibold text-pink">Currently the promo episode</p>
+                <p className="mt-0.5 text-[12px] font-semibold text-pink">{t("manage.currentlyPromoEpisode")}</p>
               )}
             </div>
             {ep.is_promo ? (
-              <span className="text-[12px] text-muted">Promo</span>
+              <span className="text-[12px] text-muted">{t("manage.promo")}</span>
             ) : (
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={actionBusy !== null || ep.status !== "published"}
                 onClick={() => setPromo(ep.id)}
-                title={ep.status !== "published" ? "Publish this episode first" : undefined}
+                title={ep.status !== "published" ? t("manage.publishFirst") : undefined}
               >
-                {actionBusy === `promo-${ep.id}` ? "Setting…" : "Set as promo"}
+                {actionBusy === `promo-${ep.id}` ? t("manage.settingPromo") : t("manage.setAsPromo")}
               </Button>
             )}
           </li>
         ))}
         {!numberedEpisodes.length && !promoClip && (
           <li className="px-4 py-6 text-center text-sm text-muted">
-            No {unitLabel.toLowerCase()}s yet — publish one, or upload a dedicated promo clip.
+            {t(isPart ? "manage.noUnitsPromo.part" : "manage.noUnitsPromo.episode")}
           </li>
         )}
       </ul>
@@ -472,7 +481,7 @@ export default function ManageTitlePage() {
           href={`/creator/upload?titleId=${title.id}&promo=1`}
           className="mt-2 inline-block text-[12px] font-medium text-pink underline underline-offset-2"
         >
-          Or upload a dedicated promo clip instead
+          {t("manage.uploadPromoInstead")}
         </Link>
       )}
     </div>
