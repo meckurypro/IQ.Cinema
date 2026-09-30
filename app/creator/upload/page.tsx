@@ -21,6 +21,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 // ---------------------------------------------------------------------------
 // Content-type config: duration cap (seconds) + what an upload "unit" is called
@@ -31,32 +33,60 @@ type ContentType = "short_episode" | "full_episode" | "one_part_film";
 const CONTENT_TYPES: {
   value: ContentType;
   label: string;
-  unitLabel: string; // "Episode" vs "Part"
+  labelKey: MessageKey;
+  unit: "episode" | "part";
   maxDurationSeconds: number;
   maxDurationLabel: string;
 }[] = [
   {
     value: "short_episode",
     label: "Short episodes",
-    unitLabel: "Episode",
+    labelKey: "upload.type.short",
+    unit: "episode",
     maxDurationSeconds: 160, // 2:40
     maxDurationLabel: "2m 40s",
   },
   {
     value: "full_episode",
     label: "Full episodes",
-    unitLabel: "Episode",
+    labelKey: "upload.type.full",
+    unit: "episode",
     maxDurationSeconds: 1200, // 20:00
     maxDurationLabel: "20m",
   },
   {
     value: "one_part_film",
     label: "One-part film",
-    unitLabel: "Part",
+    labelKey: "upload.type.film",
+    unit: "part",
     maxDurationSeconds: 7200, // 120:00
     maxDurationLabel: "120m",
   },
 ];
+
+type UnitKeys = {
+  maxPer: MessageKey; addUnit: MessageKey; inProject: MessageKey; deleteConfirm: MessageKey;
+  deleteUnit: MessageKey; promoNotNumbered: MessageKey; unitNumber: MessageKey; unitName: MessageKey;
+  limits: MessageKey; addAnother: MessageKey; footer: MessageKey; addVideo: MessageKey;
+};
+const UNIT_KEYS: Record<"episode" | "part", UnitKeys> = {
+  episode: {
+    maxPer: "upload.maxPer.episode", addUnit: "upload.addUnit.episode", inProject: "upload.inProject.episode",
+    deleteConfirm: "upload.deleteConfirm.episode", deleteUnit: "upload.deleteUnit.episode",
+    promoNotNumbered: "upload.promoNotNumbered.episode", unitNumber: "upload.unitNumber.episode",
+    unitName: "upload.unitName.episode", limits: "upload.limits.episode", addAnother: "upload.addAnother.episode",
+    footer: "upload.footer.episode", addVideo: "upload.err.addVideo.episode",
+  },
+  part: {
+    maxPer: "upload.maxPer.part", addUnit: "upload.addUnit.part", inProject: "upload.inProject.part",
+    deleteConfirm: "upload.deleteConfirm.part", deleteUnit: "upload.deleteUnit.part",
+    promoNotNumbered: "upload.promoNotNumbered.part", unitNumber: "upload.unitNumber.part",
+    unitName: "upload.unitName.part", limits: "upload.limits.part", addAnother: "upload.addAnother.part",
+    footer: "upload.footer.part", addVideo: "upload.err.addVideo.part",
+  },
+};
+
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 function getConfig(ct: ContentType) {
   return CONTENT_TYPES.find((c) => c.value === ct)!;
@@ -81,7 +111,7 @@ function formatSeconds(s: number) {
 }
 
 // Reads a video file's duration + pixel dimensions in-browser, without uploading it.
-function readVideoMetadata(file: File): Promise<{ duration: number; width: number; height: number }> {
+function readVideoMetadata(file: File, t: Translate): Promise<{ duration: number; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -94,7 +124,7 @@ function readVideoMetadata(file: File): Promise<{ duration: number; width: numbe
     };
     video.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Couldn't read that video file. Try a different file."));
+      reject(new Error(t("upload.err.readVideo")));
     };
     video.src = url;
   });
@@ -105,28 +135,31 @@ const ASPECT_TOLERANCE = 0.02;
 
 function validateVideo(
   meta: { duration: number; width: number; height: number },
-  contentType: ContentType
+  contentType: ContentType,
+  t: Translate
 ): string | null {
   const config = getConfig(contentType);
   if (meta.duration > config.maxDurationSeconds + 1) {
-    return `${config.unitLabel}s for "${config.label}" can't be longer than ${config.maxDurationLabel} (this file is ${formatSeconds(
-      meta.duration
-    )}).`;
+    return t("upload.err.tooLong", {
+      label: t(config.labelKey),
+      max: config.maxDurationLabel,
+      len: formatSeconds(meta.duration),
+    });
   }
   if (meta.height > 0) {
     const ratio = meta.width / meta.height;
     if (Math.abs(ratio - ASPECT_TARGET) > ASPECT_TOLERANCE) {
-      return `Video must be 9:16 (portrait). This file is ${meta.width}x${meta.height}.`;
+      return t("upload.err.notPortrait", { w: meta.width, h: meta.height });
     }
   }
   return null;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  processing: "Processing",
-  published: "Published",
-  suspended: "Suspended",
+const STATUS_KEY: Record<string, MessageKey> = {
+  draft: "upload.status.draft",
+  processing: "upload.status.processing",
+  published: "upload.status.published",
+  suspended: "upload.status.suspended",
 };
 
 type EpisodeRow = {
@@ -139,6 +172,7 @@ type EpisodeRow = {
 };
 
 export default function UploadPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,6 +222,7 @@ export default function UploadPage() {
   const [deleting, setDeleting] = useState(false);
 
   const config = getConfig(contentType);
+  const uk = UNIT_KEYS[config.unit];
 
   useEffect(() => {
     supabase
@@ -282,8 +317,8 @@ export default function UploadPage() {
     if (insertError || !title) {
       setError(
         insertError?.code === "23505"
-          ? "A title with this name already exists. Titles must be unique, so please choose a different name."
-          : insertError?.message ?? "Could not create title"
+          ? t("upload.err.titleExists")
+          : insertError?.message ?? t("upload.err.createTitle")
       );
       return;
     }
@@ -308,12 +343,12 @@ export default function UploadPage() {
         onProgress: (pct) => setBackfill({ id: d.id, pct }),
       });
       await uploadStoryboard(supabase, d.video_url, blob);
-      setBackfill({ id: d.id, pct: 1, msg: "Scrub preview ready." });
+      setBackfill({ id: d.id, pct: 1, msg: t("upload.previewReady") });
     } catch {
       setBackfill({
         id: d.id,
         pct: 0,
-        msg: "Couldn't build the preview from here. Re-uploading the video will build it.",
+        msg: t("upload.previewFailed"),
       });
     }
   }
@@ -327,17 +362,15 @@ export default function UploadPage() {
 
     setCheckingVideo(true);
     try {
-      const meta = await readVideoMetadata(file);
+      const meta = await readVideoMetadata(file, t);
       setVideoMeta(meta);
-      const err = validateVideo(meta, contentType);
+      const err = validateVideo(meta, contentType, t);
       setVideoError(err);
       if (!err && (await hasFastStart(file)) === false) {
-        setVideoWarning(
-          "This file isn't optimised for streaming, so viewers may see slow starts and long loading when they skip ahead. Re-export it with “fast start” (or run: ffmpeg -i in.mp4 -c copy -movflags +faststart out.mp4) before uploading."
-        );
+        setVideoWarning(t("upload.warn.fastStart"));
       }
     } catch (err: any) {
-      setVideoError(err.message ?? "Couldn't read that video file.");
+      setVideoError(err.message ?? t("upload.err.readVideoShort"));
     } finally {
       setCheckingVideo(false);
     }
@@ -346,7 +379,7 @@ export default function UploadPage() {
   async function handleSaveEpisode(targetStatus: "draft" | "processing") {
     if (!user || !titleId) return;
     if (targetStatus === "processing" && !videoFile && !existingVideoUrl) {
-      setError(`Add a video before finalizing this ${config.unitLabel.toLowerCase()}.`);
+      setError(t(uk.addVideo));
       return;
     }
     if (videoFile && videoError) {
@@ -359,7 +392,7 @@ export default function UploadPage() {
     // validated — and, further down, before the upload itself has fully
     // completed.
     if (videoFile && checkingVideo) {
-      setError("Still checking that video — one moment.");
+      setError(t("upload.err.stillChecking"));
       return;
     }
 
@@ -387,7 +420,7 @@ export default function UploadPage() {
           onProgress: setUploadProgress,
         });
       } catch (err: any) {
-        setError(err.message ?? "Upload failed. Check your connection and try again.");
+        setError(err.message ?? t("upload.err.uploadFailed"));
         setSaving(null);
         setUploadProgress(null);
         return;
@@ -464,7 +497,7 @@ export default function UploadPage() {
         p_episode_id: row.id,
       });
       if (promoErr || !promoResult?.ok) {
-        setError(promoErr?.message || promoResult?.error || "Saved, but couldn't set it as the promo episode.");
+        setError(promoErr?.message || promoResult?.error || t("upload.err.promoFailed"));
       }
     }
   }
@@ -524,17 +557,17 @@ export default function UploadPage() {
       <div className="flex items-center gap-3">
         <Link
           href={titleId ? `/creator/title/${titleId}` : "/creator/dashboard"}
-          aria-label="Back"
+          aria-label={t("common.back")}
           className="text-text"
         >
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-display text-2xl font-semibold text-text">
           {step === "title"
-            ? "New title"
+            ? t("upload.newTitle")
             : isPromoMode
-              ? `Promo clip${titleName ? ` · ${titleName}` : ""}`
-              : `Add ${config.unitLabel.toLowerCase()}${titleName ? ` · ${titleName}` : ""}`}
+              ? `${t("upload.promoClip")}${titleName ? ` · ${titleName}` : ""}`
+              : `${t(uk.addUnit)}${titleName ? ` · ${titleName}` : ""}`}
         </h1>
       </div>
 
@@ -552,14 +585,14 @@ export default function UploadPage() {
                     : "border-border bg-surface text-muted hover:border-pink/30 hover:text-text"
                 }`}
               >
-                <div>{ct.label}</div>
-                <div className="text-[10px] opacity-70">max {ct.maxDurationLabel}/{ct.unitLabel.toLowerCase()}</div>
+                <div>{t(ct.labelKey)}</div>
+                <div className="text-[10px] opacity-70">{t(UNIT_KEYS[ct.unit].maxPer, { max: ct.maxDurationLabel })}</div>
               </button>
             ))}
           </div>
           <input
             required
-            placeholder="Title"
+            placeholder={t("upload.titlePlaceholder")}
             value={titleName}
             onChange={(e) => setTitleName(e.target.value)}
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
@@ -568,12 +601,12 @@ export default function UploadPage() {
             required
             value={category}
             onChange={(e) => setCategory(e.target.value as Category)}
-            aria-label="Category"
+            aria-label={t("library.category")}
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
-                {c.label}
+                {t(c.labelKey)}
               </option>
             ))}
           </select>
@@ -584,7 +617,7 @@ export default function UploadPage() {
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text"
           >
             <option value="" disabled>
-              Genre
+              {t("upload.genre")}
             </option>
             {genres.map((g) => (
               <option key={g} value={g}>
@@ -600,19 +633,19 @@ export default function UploadPage() {
           >
             {CONTENT_RATINGS.map((r) => (
               <option key={r.value} value={r.value}>
-                {r.label}
+                {t(r.labelKey)}
               </option>
             ))}
           </select>
           <textarea
-            placeholder="Synopsis"
+            placeholder={t("upload.synopsis")}
             value={synopsis}
             onChange={(e) => setSynopsis(e.target.value)}
             rows={3}
             className="w-full rounded-md border border-border bg-surface px-4 py-3 text-[14px] text-text placeholder:text-muted"
           />
           <label className="flex h-12 w-full cursor-pointer items-center justify-between rounded-md border border-dashed border-border bg-surface px-4 text-[13px] text-muted">
-            {posterFile ? posterFile.name : "Poster image (3:4)"}
+            {posterFile ? posterFile.name : t("upload.poster")}
             <Upload size={15} />
             <input
               type="file"
@@ -623,7 +656,7 @@ export default function UploadPage() {
           </label>
           {error && <p className="text-[13px] text-crimson">{error}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={saving !== null}>
-            {saving ? "Creating…" : "Continue"}
+            {saving ? t("upload.creating") : t("upload.continue")}
           </Button>
         </form>
       ) : (
@@ -640,7 +673,7 @@ export default function UploadPage() {
           {units.length > 0 && (
             <div className="space-y-2">
               <p className="text-[12px] font-medium uppercase tracking-wide text-muted">
-                {config.unitLabel}s in this project
+                {t(uk.inProject)}
               </p>
               {units.map((d) => (
                 <div
@@ -654,11 +687,13 @@ export default function UploadPage() {
                     className="flex w-full items-center justify-between"
                   >
                     <span className="text-text">
-                      {d.episode_number === 0 ? "Promo clip" : `${config.unitLabel} ${d.episode_number}`}
+                      {d.episode_number === 0
+                        ? t("upload.promoClip")
+                        : t(config.unit === "part" ? "upload.partN" : "common.episodeN", { n: d.episode_number })}
                       {d.name ? ` · ${d.name}` : ""}
                     </span>
                     <span className="text-[11px] text-muted">
-                      {STATUS_LABEL[d.status] ?? d.status}
+                      {STATUS_KEY[d.status] ? t(STATUS_KEY[d.status]) : d.status}
                     </span>
                   </button>
                   {episodeRowId === d.id && (
@@ -672,8 +707,8 @@ export default function UploadPage() {
                             className="text-[12px] font-medium text-pink transition-colors duration-150 hover:text-pink/75 disabled:opacity-50"
                           >
                             {backfill?.id === d.id && !backfill.msg
-                              ? `Building scrub preview… ${Math.round(backfill.pct * 100)}%`
-                              : "Build scrub preview"}
+                              ? t("upload.buildingPct", { pct: Math.round(backfill.pct * 100) })
+                              : t("upload.buildPreview")}
                           </button>
                           {backfill?.id === d.id && backfill.msg && (
                             <p className="mt-1 text-[11px] text-muted">{backfill.msg}</p>
@@ -683,7 +718,7 @@ export default function UploadPage() {
                       {confirmDeleteId === d.id ? (
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[12px] text-crimson">
-                            Delete this {config.unitLabel.toLowerCase()} and its video?
+                            {t(uk.deleteConfirm)}
                           </span>
                           <div className="flex gap-2">
                             <button
@@ -692,14 +727,14 @@ export default function UploadPage() {
                               onClick={() => handleDeleteEpisode(d.id)}
                               className="rounded-md bg-crimson px-2.5 py-1 text-[11px] font-semibold text-white transition-all duration-150 hover:brightness-110 active:scale-[0.97] active:brightness-95 disabled:opacity-50 disabled:pointer-events-none"
                             >
-                              {deleting ? "Deleting…" : "Confirm"}
+                              {deleting ? t("upload.deleting") : t("upload.confirm")}
                             </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
                               className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted transition-colors duration-150 hover:bg-border/40 active:scale-[0.97]"
                             >
-                              Cancel
+                              {t("common.cancel")}
                             </button>
                           </div>
                         </div>
@@ -709,7 +744,7 @@ export default function UploadPage() {
                           onClick={() => setConfirmDeleteId(d.id)}
                           className="flex items-center gap-1 text-[12px] font-medium text-crimson transition-colors duration-150 hover:text-crimson/75"
                         >
-                          <Trash2 size={13} /> Delete {config.unitLabel.toLowerCase()}
+                          <Trash2 size={13} /> {t(uk.deleteUnit)}
                         </button>
                       )}
                     </div>
@@ -728,21 +763,21 @@ export default function UploadPage() {
           >
             {isPromoMode ? (
               <div className="flex h-12 w-full items-center rounded-md border border-dashed border-border bg-surface px-4 text-[14px] text-muted">
-                Promo clip — not part of the numbered {config.unitLabel.toLowerCase()}s
+                {t(uk.promoNotNumbered)}
               </div>
             ) : (
               <input
                 type="number"
                 required
                 min={1}
-                placeholder={`${config.unitLabel} number`}
+                placeholder={t(uk.unitNumber)}
                 value={episodeNumber}
                 onChange={(e) => setEpisodeNumber(Number(e.target.value))}
                 className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
               />
             )}
             <input
-              placeholder={`${config.unitLabel} name (optional)`}
+              placeholder={t(uk.unitName)}
               value={episodeName}
               onChange={(e) => setEpisodeName(e.target.value)}
               className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
@@ -751,8 +786,8 @@ export default function UploadPage() {
               {videoFile
                 ? videoFile.name
                 : existingVideoUrl
-                ? "Video attached — choose a file to replace it"
-                : "Video file (MP4/MOV, 9:16)"}
+                ? t("upload.videoAttached")
+                : t("upload.videoFile")}
               <Upload size={15} />
               <input
                 type="file"
@@ -761,17 +796,17 @@ export default function UploadPage() {
                 onChange={(e) => handleSelectVideo(e.target.files?.[0] ?? null)}
               />
             </label>
-            {checkingVideo && <p className="text-[12px] text-muted">Checking video…</p>}
+            {checkingVideo && <p className="text-[12px] text-muted">{t("upload.checkingVideo")}</p>}
             {videoMeta && !videoError && (
               <p className="text-[12px] text-muted">
                 {formatSeconds(videoMeta.duration)} · {videoMeta.width}x{videoMeta.height} ✓
-                {existingVideoUrl && videoFile ? " — will replace the current video" : ""}
+                {existingVideoUrl && videoFile ? t("upload.willReplace") : ""}
               </p>
             )}
             {videoError && <p className="text-[13px] text-crimson">{videoError}</p>}
             {!videoError && videoWarning && <p className="text-[13px] text-gold">{videoWarning}</p>}
             {buildingPreview && (
-              <p className="text-[12px] text-muted">Building scrub preview…</p>
+              <p className="text-[12px] text-muted">{t("upload.buildingPreview")}</p>
             )}
             {uploadProgress !== null && (
               <div className="space-y-1">
@@ -782,12 +817,12 @@ export default function UploadPage() {
                   />
                 </div>
                 <p className="text-[11px] text-muted">
-                  Uploading… {Math.round(uploadProgress * 100)}% — you can lock your screen, just don't close the app.
+                  {t("upload.uploadingHint", { pct: Math.round(uploadProgress * 100) })}
                 </p>
               </div>
             )}
             <p className="text-[11px] text-muted">
-              {config.label}: max {config.maxDurationLabel} per {config.unitLabel.toLowerCase()}, 9:16 portrait only.
+              {t(uk.limits, { label: t(config.labelKey), max: config.maxDurationLabel })}
             </p>
 
             {error && <p className="text-[13px] text-crimson">{error}</p>}
@@ -795,7 +830,7 @@ export default function UploadPage() {
             {justSaved && (
               <div className="flex items-center gap-2 rounded-md border border-emerald-600/40 bg-emerald-600/10 px-4 py-2 text-[13px] text-emerald-500">
                 <Check size={15} />
-                {justSaved === "draft" ? "Saved as draft." : "Finalized — processing now."}
+                {justSaved === "draft" ? t("upload.savedDraft") : t("upload.finalized")}
               </div>
             )}
 
@@ -810,16 +845,16 @@ export default function UploadPage() {
               >
                 {saving === "draft"
                   ? uploadProgress !== null
-                    ? `Uploading ${Math.round(uploadProgress * 100)}%`
-                    : "Saving…"
-                  : "Save as draft"}
+                    ? t("upload.uploadingPct", { pct: Math.round(uploadProgress * 100) })
+                    : t("upload.saving")
+                  : t("upload.saveDraft")}
               </Button>
               <Button type="submit" className="flex-1" size="lg" disabled={videoBusy || !!videoError}>
                 {saving === "submit"
                   ? uploadProgress !== null
-                    ? `Uploading ${Math.round(uploadProgress * 100)}%`
-                    : "Finalizing…"
-                  : "Finalize"}
+                    ? t("upload.uploadingPct", { pct: Math.round(uploadProgress * 100) })
+                    : t("upload.finalizing")
+                  : t("upload.finalize")}
               </Button>
             </div>
 
@@ -830,14 +865,12 @@ export default function UploadPage() {
                 variant="ghost"
                 className="w-full border border-dashed border-border text-[13px] text-muted hover:border-pink/40 hover:text-text"
               >
-                <Plus size={14} /> Add another {config.unitLabel.toLowerCase()}
+                <Plus size={14} /> {t(uk.addAnother)}
               </Button>
             )}
 
             <p className="text-center text-[12px] text-muted">
-              A video must finish uploading before it can be saved as a draft or finalized. Finalizing
-              starts automatic processing for this {config.unitLabel.toLowerCase()} — the project itself
-              only goes live once you submit it for admin review from its management page.
+              {t(uk.footer)}
             </p>
           </form>
         </div>

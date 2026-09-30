@@ -4,9 +4,9 @@
 // titles_content_rating_check constraint in the database.
 export type ContentRating = "G" | "13+" | "16+" | "18+";
 
-export const CONTENT_RATINGS: { value: ContentRating; label: string }[] = [
-  { value: "G", label: "G — General audiences" },
-  { value: "13+", label: "13+ — Teens and up" },
-  { value: "16+", label: "16+ — Mature teens" },
-  { value: "18+", label: "18+ — Adults only" },
+export const CONTENT_RATINGS: { value: ContentRating; label: string; labelKey: `rating.${ContentRating}` }[] = [
+  { value: "G", label: "G — General audiences", labelKey: "rating.G" },
+  { value: "13+", label: "13+ — Teens and up", labelKey: "rating.13+" },
+  { value: "16+", label: "16+ — Mature teens", labelKey: "rating.16+" },
+  { value: "18+", label: "18+ — Adults only", labelKey: "rating.18+" },
 ];
