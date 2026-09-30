@@ -15,8 +15,10 @@ import { PlayerTopBar } from "@/components/watch/PlayerTopBar";
 import { SpeedSheet } from "@/components/watch/SpeedSheet";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 function OfflinePlayer() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   const epId = params.get("ep");
@@ -112,13 +114,13 @@ function OfflinePlayer() {
         />
       ) : (
         <div className="flex h-full items-center justify-center px-8 text-center text-sm text-white/60">
-          {failed || !complete ? "This episode isn't available offline." : null}
+          {failed || !complete ? t("downloads.notAvailableOffline") : null}
         </div>
       )}
 
       <SpeedSheet open={showSpeed} onClose={() => setShowSpeed(false)} speed={speed} onSelect={setSpeed} />
 
-      <BottomSheet open={showMore} onClose={() => setShowMore(false)} title="Downloaded episodes">
+      <BottomSheet open={showMore} onClose={() => setShowMore(false)} title={t("downloads.downloadedEpisodes")}>
         <div className="flex flex-col gap-1 px-3 pb-2 pt-1">
           {playable.map((e) => (
             <button
@@ -130,7 +132,7 @@ function OfflinePlayer() {
                 e.episodeId === episode.episodeId ? "font-semibold text-pink" : "font-medium text-text"
               )}
             >
-              <span>EP.{e.episodeNumber}</span>
+              <span>{t("common.epShort", { n: e.episodeNumber })}</span>
             </button>
           ))}
           <button
@@ -139,7 +141,7 @@ function OfflinePlayer() {
             className="mt-1 flex items-center gap-2.5 rounded-md px-1.5 py-2.5 text-left text-[14px] font-medium text-crimson transition-colors active:bg-surface-raised"
           >
             <Trash2 size={18} />
-            Delete this download
+            {t("downloads.deleteThis")}
           </button>
         </div>
       </BottomSheet>

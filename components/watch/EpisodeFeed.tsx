@@ -22,6 +22,7 @@ import { MoreSheet } from "@/components/watch/MoreSheet";
 import { CommentsSheet } from "@/components/watch/CommentsSheet";
 import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
 import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
+import { useI18n } from "@/hooks/useI18n";
 
 type FeedEpisode = {
   id: string;
@@ -70,6 +71,7 @@ export function EpisodeFeed({
   // embed instead of navigating.
   onClose?: () => void;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const goBack = () => (onClose ? onClose() : router.back());
   const { user } = useAuth();
@@ -223,7 +225,7 @@ export function EpisodeFeed({
           router.push("/wallet");
           return;
         }
-        setError(rpcError?.message || data?.error || "Could not unlock episode");
+        setError(rpcError?.message || data?.error || t("feed.unlockFailed"));
         return;
       }
       setUnlockedIds((prev) => new Set(prev).add(episodeId));
@@ -442,8 +444,8 @@ export function EpisodeFeed({
     const path = episodePath(titleData?.slug, episode.episode_number, episode.id);
     const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : "";
     const heading = titleData?.title
-      ? `${titleData.title} · Episode ${episode.episode_number}`
-      : `Episode ${episode.episode_number}`;
+      ? `${titleData.title} · ${t("common.episodeN", { n: episode.episode_number })}`
+      : t("common.episodeN", { n: episode.episode_number });
     const { data } = await supabase.rpc("record_episode_share", { p_episode_id: episode.id });
     setEngagement((prev) => ({
       ...prev,
@@ -455,7 +457,7 @@ export function EpisodeFeed({
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ title: heading, text: `Watch ${heading} on IQ Cinema`, url });
+        await navigator.share({ title: heading, text: t("feed.shareText", { heading }), url });
         return;
       } catch {
         return;
@@ -618,25 +620,25 @@ export function EpisodeFeed({
                         onClick={() => grantUnlock(ep.id)}
                       >
                         <Zap size={16} className="fill-current" />
-                        Unlock for {ep.unlock_cost_coins ?? defaultUnlockCost} coins
+                        {t("feed.unlockFor", { n: ep.unlock_cost_coins ?? defaultUnlockCost })}
                       </Button>
                       <button
                         onClick={() => router.push("/wallet")}
                         className="text-sm font-medium text-white/70 underline underline-offset-4"
                       >
-                        See subscription plans
+                        {t("feed.seePlans")}
                       </button>
                     </>
                   ) : (
                     <>
                       <p className="font-display text-lg font-semibold text-white">
                         {ep.episode_number <= freeCount
-                          ? `Episode ${ep.episode_number} is free to watch`
-                          : `Episode ${ep.episode_number} is locked`}
+                          ? t("feed.epFree", { n: ep.episode_number })
+                          : t("feed.epLocked", { n: ep.episode_number })}
                       </p>
-                      <p className="mt-1 text-sm text-white/60">Sign in to start watching.</p>
+                      <p className="mt-1 text-sm text-white/60">{t("feed.signInToWatch")}</p>
                       <Button variant="primary" size="lg" onClick={() => router.push("/auth/login")}>
-                        Sign in
+                        {t("auth.signIn")}
                       </Button>
                     </>
                   )}
@@ -650,7 +652,7 @@ export function EpisodeFeed({
       {shareToast && (
         <div className="absolute inset-x-0 bottom-28 z-30 flex justify-center">
           <span className="rounded-full bg-black/70 px-3.5 py-1.5 text-[12px] font-medium text-white">
-            Link copied
+            {t("foryou.linkCopied")}
           </span>
         </div>
       )}
@@ -663,11 +665,11 @@ export function EpisodeFeed({
         downloadState={offline.episodeState(active.id)}
         downloadDisabledReason={
           !user
-            ? "Sign in to download"
+            ? t("feed.signInToDownload")
             : !active.video_url
-              ? "Not available to download"
+              ? t("feed.notAvailableDownload")
               : !isUnlocked(active)
-                ? "Unlock this episode to download"
+                ? t("feed.unlockToDownload")
                 : null
         }
         onDownload={handleDownload}
@@ -715,7 +717,7 @@ export function EpisodeFeed({
         open={showDetails}
         onClose={() => setShowDetails(false)}
         titleId={active.title_id}
-        title={titleData?.title ?? (active.name || `Episode ${active.episode_number}`)}
+        title={titleData?.title ?? (active.name || t("common.episodeN", { n: active.episode_number }))}
         synopsis={titleData?.synopsis ?? null}
         views={titleData?.total_unique_views ?? 0}
         contentRating={titleData?.content_rating}
