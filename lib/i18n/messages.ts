@@ -342,6 +342,12 @@ export const en = {
   "downloads.notAvailableOffline": "This episode isn't available offline.",
   "downloads.downloadedEpisodes": "Downloaded episodes",
   "downloads.deleteThis": "Delete this download",
+  "notifications.bell": "Notifications",
+  "whatsapp.title": "Link WhatsApp",
+  "whatsapp.inUse": "That number is already linked to another account.",
+  "whatsapp.invalid": "Enter a valid phone number.",
+  "whatsapp.linking": "Linking…",
+  "whatsapp.link": "Link number",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -685,6 +691,12 @@ export const fr: Record<MessageKey, string> = {
   "downloads.notAvailableOffline": "Cet épisode n'est pas disponible hors ligne.",
   "downloads.downloadedEpisodes": "Épisodes téléchargés",
   "downloads.deleteThis": "Supprimer ce téléchargement",
+  "notifications.bell": "Notifications",
+  "whatsapp.title": "Lier WhatsApp",
+  "whatsapp.inUse": "Ce numéro est déjà lié à un autre compte.",
+  "whatsapp.invalid": "Saisissez un numéro de téléphone valide.",
+  "whatsapp.linking": "Liaison…",
+  "whatsapp.link": "Lier le numéro",
 };
 
 export const dictionaries: Record<string, Record<MessageKey, string>> = { en, fr };

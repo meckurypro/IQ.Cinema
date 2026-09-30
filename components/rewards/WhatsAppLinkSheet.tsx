@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 
@@ -18,6 +19,7 @@ export function WhatsAppLinkSheet({
   onClose: () => void;
   onLinked: () => void;
 }) {
+  const { t } = useI18n();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function WhatsAppLinkSheet({
     const { data, error: rpcError } = await supabase.rpc("link_whatsapp", { p_number: value });
     setBusy(false);
     if (rpcError || !data?.ok) {
-      setError(data?.error === "number_in_use" ? "That number is already linked to another account." : "Enter a valid phone number.");
+      setError(data?.error === "number_in_use" ? t("whatsapp.inUse") : t("whatsapp.invalid"));
       return;
     }
     setValue("");
@@ -36,7 +38,7 @@ export function WhatsAppLinkSheet({
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Link WhatsApp">
+    <BottomSheet open={open} onClose={onClose} title={t("whatsapp.title")}>
       <div className="px-4 pb-4 pt-1">
         <p className="text-[13px] text-muted">
           Add your WhatsApp number so we can reach you about your account and orders.
@@ -52,7 +54,7 @@ export function WhatsAppLinkSheet({
         />
         {error && <p className="mt-2 text-[12.5px] text-crimson">{error}</p>}
         <Button className="mt-4 w-full" disabled={busy || !value.trim()} onClick={submit}>
-          {busy ? "Linking…" : "Link number"}
+          {busy ? t("whatsapp.linking") : t("whatsapp.link")}
         </Button>
       </div>
     </BottomSheet>
