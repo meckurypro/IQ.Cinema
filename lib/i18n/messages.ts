@@ -500,6 +500,8 @@ export const en = {
   "manage.settingPromo": "Setting…",
   "manage.setAsPromo": "Set as promo",
   "manage.uploadPromoInstead": "Or upload a dedicated promo clip instead",
+  "tags.extraHint": "Extra tags (optional, up to {max}) — {n}/{max}",
+  "watch.moreLikeThis": "More like this",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1001,6 +1003,8 @@ export const fr: Record<MessageKey, string> = {
   "manage.settingPromo": "Définition…",
   "manage.setAsPromo": "Définir comme promo",
   "manage.uploadPromoInstead": "Ou envoyez plutôt un clip promo dédié",
+  "tags.extraHint": "Tags supplémentaires (facultatif, jusqu'à {max}) — {n}/{max}",
+  "watch.moreLikeThis": "Dans le même esprit",
 };
 
 export const dictionaries: Record<string, Record<MessageKey, string>> = { en, fr };

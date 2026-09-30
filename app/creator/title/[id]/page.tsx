@@ -17,6 +17,7 @@ import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
 import clsx from "clsx";
 import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { TagPicker } from "@/components/creator/TagPicker";
 
 type TitleStatus =
   | "draft"
@@ -94,13 +95,14 @@ export default function ManageTitlePage() {
   const [editTitle, setEditTitle] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editGenre, setEditGenre] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [editCategory, setEditCategory] = useState<Category>(DEFAULT_CATEGORY);
   const [editContentRating, setEditContentRating] = useState<ContentRating>("13+");
   const [editPosterFile, setEditPosterFile] = useState<File | null>(null);
   const [savingDetails, setSavingDetails] = useState(false);
 
   async function load() {
-    const [{ data: t }, { data: eps }] = await Promise.all([
+    const [{ data: t }, { data: eps }, { data: tagRows }] = await Promise.all([
       supabase
         .from("titles")
         .select(
@@ -113,6 +115,7 @@ export default function ManageTitlePage() {
         .select("id, episode_number, name, status, video_url, is_promo")
         .eq("title_id", id)
         .order("episode_number", { ascending: true }),
+      supabase.from("title_genres").select("genres(name)").eq("title_id", id),
     ]);
     setTitle((t as TitleRow) ?? null);
     setEpisodes((eps as EpisodeRow[]) ?? []);
@@ -120,6 +123,11 @@ export default function ManageTitlePage() {
       setEditTitle(t.title);
       setEditSynopsis(t.synopsis ?? "");
       setEditGenre(t.genre ?? "");
+      setEditTags(
+        ((tagRows ?? []) as unknown as { genres: { name: string } | null }[])
+          .map((r) => r.genres?.name)
+          .filter((n): n is string => !!n)
+      );
       setEditCategory((t.category as Category) ?? DEFAULT_CATEGORY);
       setEditContentRating((t.content_rating as ContentRating) ?? "13+");
     }
@@ -167,8 +175,8 @@ export default function ManageTitlePage() {
       })
       .eq("id", title.id);
 
-    setSavingDetails(false);
     if (updErr) {
+      setSavingDetails(false);
       setError(
         updErr.code === "23505"
           ? t("upload.err.titleExists")
@@ -176,6 +184,20 @@ export default function ManageTitlePage() {
       );
       return;
     }
+
+    // Replace the extra-tag set: clear, then insert the current picks.
+    const keep = editTags.filter((n) => n !== editGenre);
+    const { error: clearErr } = await supabase.from("title_genres").delete().eq("title_id", title.id);
+    if (!clearErr && keep.length) {
+      const { data: gRows } = await supabase.from("genres").select("id, name").in("name", keep);
+      if (gRows?.length) {
+        const { error: tagErr } = await supabase
+          .from("title_genres")
+          .insert(gRows.map((g) => ({ title_id: title.id, genre_id: g.id })));
+        if (tagErr) setError(tagErr.message);
+      }
+    }
+    setSavingDetails(false);
     setEditing(false);
     setEditPosterFile(null);
     load();
@@ -347,6 +369,9 @@ export default function ManageTitlePage() {
               </option>
             ))}
           </select>
+          {editGenre && (
+            <TagPicker options={genres} primary={editGenre} selected={editTags} onChange={setEditTags} />
+          )}
           <select
             value={editContentRating}
             onChange={(e) => setEditContentRating(e.target.value as ContentRating)}
