@@ -10,8 +10,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { useI18n } from "@/hooks/useI18n";
+import { translateAuthError } from "@/lib/i18n/authErrors";
 
 export default function ResetPasswordPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const supabase = createClient();
 
@@ -38,11 +41,11 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+      setError(t("auth.passwordMin"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords don't match.");
+      setError(t("auth.passwordsDontMatch"));
       return;
     }
 
@@ -51,7 +54,7 @@ export default function ResetPasswordPage() {
     setLoading(false);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(translateAuthError(updateError.message, t));
       return;
     }
 
@@ -65,7 +68,7 @@ export default function ResetPasswordPage() {
   if (checking) {
     return (
       <div className="flex min-h-dvh items-center justify-center text-[14px] text-muted">
-        Checking your link…
+        {t("auth.checkingLink")}
       </div>
     );
   }
@@ -73,13 +76,13 @@ export default function ResetPasswordPage() {
   if (!hasSession) {
     return (
       <div className="flex min-h-dvh flex-col justify-center px-6 fade-in">
-        <h1 className="font-display text-3xl font-semibold text-text">Link expired</h1>
+        <h1 className="font-display text-3xl font-semibold text-text">{t("auth.linkExpired")}</h1>
         <p className="mt-1.5 text-sm text-muted">
-          This password reset link is invalid or has expired. Request a new one to continue.
+          {t("auth.linkExpiredBody")}
         </p>
         <Link href="/auth/forgot-password" className="mt-7 block">
           <Button className="w-full" size="lg">
-            Request a new link
+            {t("auth.requestNewLink")}
           </Button>
         </Link>
       </div>
@@ -88,32 +91,32 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="flex min-h-dvh flex-col justify-center px-6 fade-in">
-      <h1 className="font-display text-3xl font-semibold text-text">Set a new password</h1>
-      <p className="mt-1.5 text-sm text-muted">Choose something you haven't used before.</p>
+      <h1 className="font-display text-3xl font-semibold text-text">{t("auth.setNewPassword")}</h1>
+      <p className="mt-1.5 text-sm text-muted">{t("auth.chooseNew")}</p>
 
       {done ? (
         <div className="mt-7 rounded-md border border-emerald-600/40 bg-emerald-600/10 px-4 py-3 text-[14px] text-emerald-500">
-          Password updated — signing you in…
+          {t("auth.passwordUpdated")}
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="mt-7 space-y-3">
           <PasswordInput
             required
             minLength={6}
-            placeholder="New password"
+            placeholder={t("auth.newPassword")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <PasswordInput
             required
             minLength={6}
-            placeholder="Confirm new password"
+            placeholder={t("auth.confirmNewPassword")}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
           {error && <p className="text-[13px] text-crimson">{error}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? "Updating…" : "Update password"}
+            {loading ? t("auth.updating") : t("auth.updatePassword")}
           </Button>
         </form>
       )}

@@ -8,8 +8,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/hooks/useI18n";
+import { translateAuthError } from "@/lib/i18n/authErrors";
 
 export default function ForgotPasswordPage() {
+  const { t } = useI18n();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,7 +30,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(false);
     if (resetError) {
-      setError(resetError.message);
+      setError(translateAuthError(resetError.message, t));
       return;
     }
     setSent(true);
@@ -35,11 +38,11 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="flex min-h-dvh flex-col justify-center px-6 fade-in">
-      <h1 className="font-display text-3xl font-semibold text-text">Reset your password</h1>
+      <h1 className="font-display text-3xl font-semibold text-text">{t("auth.resetYourPassword")}</h1>
       <p className="mt-1.5 text-sm text-muted">
         {sent
-          ? "Check your inbox for a reset link."
-          : "Enter the email on your account and we'll send you a reset link."}
+          ? t("auth.checkInbox")
+          : t("auth.enterEmailForReset")}
       </p>
 
       {!sent ? (
@@ -47,25 +50,25 @@ export default function ForgotPasswordPage() {
           <input
             type="email"
             required
-            placeholder="Email"
+            placeholder={t("auth.email")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[15px] text-text placeholder:text-muted"
           />
           {error && <p className="text-[13px] text-crimson">{error}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? "Sending…" : "Send reset link"}
+            {loading ? t("auth.sending") : t("auth.sendResetLink")}
           </Button>
         </form>
       ) : (
         <div className="mt-7 rounded-md border border-border bg-surface px-4 py-3 text-[14px] text-text">
-          Sent to <span className="font-medium">{email}</span>. Didn't get it? Check spam, or{" "}
+          {t("auth.sentToPrefix")} <span className="font-medium">{email}</span>. {t("auth.didntGetIt")}{" "}
           <button
             type="button"
             onClick={() => setSent(false)}
             className="font-medium underline underline-offset-4"
           >
-            try again
+            {t("auth.tryAgain")}
           </button>
           .
         </div>
@@ -73,7 +76,7 @@ export default function ForgotPasswordPage() {
 
       <p className="mt-5 text-center text-sm text-muted">
         <Link href="/auth/login" className="font-medium text-text underline underline-offset-4">
-          Back to sign in
+          {t("auth.backToSignIn")}
         </Link>
       </p>
     </div>

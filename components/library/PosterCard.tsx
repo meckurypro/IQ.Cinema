@@ -1,9 +1,12 @@
 // components/library/PosterCard.tsx
 
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import clsx from "clsx";
 import { progressLabel, watchHref, type MyListItem } from "@/lib/myList";
+import { useI18n } from "@/hooks/useI18n";
 
 // Grid card for the Following and Reminder tabs.
 export function PosterCard({
@@ -15,6 +18,7 @@ export function PosterCard({
   // show a status line instead of episode progress.
   upcoming?: boolean;
 }) {
+  const { t } = useI18n();
   const label = item.tags[0];
 
   const body = (
@@ -33,18 +37,18 @@ export function PosterCard({
             className="object-cover transition-transform duration-300 group-active:scale-95"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted">No poster</div>
+          <div className="flex h-full items-center justify-center text-xs text-muted">{t("common.poster.none")}</div>
         )}
 
         {item.is_exclusive && (
           <span className="absolute left-1.5 top-1.5 rounded-sm bg-crimson px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            Exclusive
+            {t("title.exclusive")}
           </span>
         )}
 
         {item.has_new_episode && (
           <span className="absolute right-0 top-0 rounded-bl-lg bg-gradient-to-r from-orange-500 to-pink px-2 py-1 text-[12px] font-bold leading-none text-white">
-            New EP
+            {t("library.newEp")}
           </span>
         )}
 
@@ -57,7 +61,7 @@ export function PosterCard({
       </div>
 
       <p className="mt-2 truncate text-[14px] font-semibold text-text">{item.title.trim()}</p>
-      <p className="mt-0.5 text-[12.5px] text-muted">{upcoming ? "Coming soon" : progressLabel(item)}</p>
+      <p className="mt-0.5 text-[12.5px] text-muted">{upcoming ? t("title.comingSoon") : progressLabel(item, t)}</p>
     </>
   );
 

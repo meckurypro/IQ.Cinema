@@ -7,11 +7,12 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { useI18n } from "@/hooks/useI18n";
 
 const staticTabs = [
-  { key: "popular", label: "Popular" },
-  { key: "new", label: "New" },
-  { key: "ranking", label: "Ranking" },
+  { key: "popular", labelKey: "home.popular" },
+  { key: "new", labelKey: "home.new" },
+  { key: "ranking", labelKey: "home.ranking" },
 ] as const;
 
 export function CategoryTabs({
@@ -23,6 +24,7 @@ export function CategoryTabs({
   activeGenre?: string;
   genres: string[];
 }) {
+  const { t } = useI18n();
   const isGenreActive = activeTab === "genre";
   const [open, setOpen] = useState(false);
 
@@ -46,7 +48,7 @@ export function CategoryTabs({
 
   return (
     <div className="relative flex items-center gap-5 px-4 pb-3 pt-4">
-      {staticTabs.map(({ key, label }) => {
+      {staticTabs.map(({ key, labelKey }) => {
         const active = activeTab === key;
         return (
           <Link
@@ -60,7 +62,7 @@ export function CategoryTabs({
               active ? "text-text" : "text-muted"
             )}
           >
-            {label}
+            {t(labelKey)}
           </Link>
         );
       })}
@@ -76,7 +78,7 @@ export function CategoryTabs({
           isGenreActive ? "text-text" : "text-muted"
         )}
       >
-        Genres
+        {t("home.genres")}
         <ChevronDown size={17} strokeWidth={3} />
       </button>
 
@@ -88,7 +90,7 @@ export function CategoryTabs({
         />
       )}
 
-      <BottomSheet open={open} onClose={() => setOpen(false)} title="Genres">
+      <BottomSheet open={open} onClose={() => setOpen(false)} title={t("home.genres")}>
         <div className="flex flex-col pb-1">
           {genres.map((genre) => (
             <Link
@@ -106,7 +108,7 @@ export function CategoryTabs({
             </Link>
           ))}
           {!genres.length && (
-            <p className="px-5 py-3 text-sm text-muted">No genres yet</p>
+            <p className="px-5 py-3 text-sm text-muted">{t("home.noGenres")}</p>
           )}
         </div>
       </BottomSheet>

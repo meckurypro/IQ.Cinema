@@ -4,14 +4,15 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 export type TopTab = "following" | "history" | "reminders";
 
-const TABS: { value: TopTab; label: string }[] = [
-  { value: "following", label: "Following" },
-  { value: "history", label: "History" },
-  { value: "reminders", label: "Reminder Set" },
-];
+const TABS = [
+  { value: "following", labelKey: "library.following" },
+  { value: "history", labelKey: "library.history" },
+  { value: "reminders", labelKey: "library.reminders" },
+] as const satisfies readonly { value: TopTab; labelKey: string }[];
 
 // Same type and colours as the Home tabs (components/home/CategoryTabs.tsx).
 // At that size the three titles take ~330px, so this row holds nothing else.
@@ -22,6 +23,7 @@ export function LibraryTabs({
   value: TopTab;
   onChange: (tab: TopTab) => void;
 }) {
+  const { t } = useI18n();
   const refs = useRef<Record<TopTab, HTMLButtonElement | null>>({
     following: null,
     history: null,
@@ -48,10 +50,10 @@ export function LibraryTabs({
     // the screen is what made the bottom nav drift out of view.
     <div
       role="tablist"
-      aria-label="My List"
+      aria-label={t("library.myList")}
       className="no-scrollbar relative flex gap-4 overflow-x-auto pb-3 pt-1 min-[375px]:gap-5"
     >
-      {TABS.map(({ value: tab, label }) => (
+      {TABS.map(({ value: tab, labelKey }) => (
         <button
           key={tab}
           ref={(el) => {
@@ -65,7 +67,7 @@ export function LibraryTabs({
             value === tab ? "text-text" : "text-muted"
           )}
         >
-          {label}
+          {t(labelKey)}
         </button>
       ))}
       {center !== null && (

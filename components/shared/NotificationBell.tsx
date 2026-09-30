@@ -7,10 +7,12 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 
 export function NotificationBell() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [unread, setUnread] = useState(0);
 
@@ -46,7 +48,7 @@ export function NotificationBell() {
   }, [user]);
 
   return (
-    <Link href="/notifications" aria-label="Notifications" className="relative p-1 text-text">
+    <Link href="/notifications" aria-label={t("notifications.bell")} className="relative p-1 text-text">
       <Bell size={22} />
       {unread > 0 && (
         <span className="absolute right-0 top-0 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-crimson ring-2 ring-bg" />

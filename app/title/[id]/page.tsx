@@ -6,7 +6,7 @@ import Image from "next/image";
 import { notFound, permanentRedirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TitleActions } from "@/components/title/TitleActions";
-import { formatEpisodeCount } from "@/lib/format";
+import { TitleMeta } from "@/components/title/TitleMeta";
 import { UUID_RE, stripLegacySlugSuffix, titlePath } from "@/lib/links";
 
 const TITLE_COLS =
@@ -108,10 +108,11 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         <h1 className="font-display text-[22px] font-semibold leading-tight text-text">
           {title.title}
         </h1>
-        <p className="mt-1 text-[13px] text-muted">
-          {title.content_rating} ·{" "}
-          {title.status === "coming_soon" ? "Coming soon" : formatEpisodeCount(episodes.length)}
-        </p>
+        <TitleMeta
+          contentRating={title.content_rating}
+          status={title.status}
+          episodeCount={episodes.length}
+        />
 
         {title.synopsis && (
           <p className="mt-3 text-[14px] leading-relaxed text-text/85">{title.synopsis}</p>

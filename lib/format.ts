@@ -6,9 +6,13 @@ export function formatCount(n: number) {
   return String(n);
 }
 
-// "1 episode", "12 episodes". Singular for anything below 2.
-export function formatEpisodeCount(n: number) {
-  return `${n} ${n < 2 ? "episode" : "episodes"}`;
+// "1 episode", "12 episodes". Singular for anything below 2. Takes the
+// translator from useI18n() so the label follows the selected language.
+export function formatEpisodeCount(
+  n: number,
+  t: (key: "common.episode" | "common.episodes", vars?: Record<string, string | number>) => string
+) {
+  return t(n < 2 ? "common.episode" : "common.episodes", { n });
 }
 
 // 754 -> "12:34"

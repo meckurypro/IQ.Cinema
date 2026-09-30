@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Play, Pause, Loader2, RotateCcw, RotateCw, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { SB_FRAME_H, SB_FRAME_W, storyboardLayout } from "@/lib/storyboard";
+import { useI18n } from "@/hooks/useI18n";
 
 const AUTO_HIDE_MS = 3000;
 const DOUBLE_TAP_MS = 280;
@@ -82,6 +83,7 @@ export function VideoPlayer({
   // action rail is positioned just above it so the two never overlap.
   cta?: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
@@ -534,7 +536,7 @@ export function VideoPlayer({
             setIconPulse((n) => n + 1);
             togglePlay();
           }}
-          aria-label={failed ? "Retry" : showSpinner ? "Loading" : playing ? "Pause" : "Play"}
+          aria-label={failed ? t("player.retry") : showSpinner ? t("player.loading") : playing ? t("player.pause") : t("player.play")}
           className="pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/45 text-white active:scale-95"
         >
           {failed ? (

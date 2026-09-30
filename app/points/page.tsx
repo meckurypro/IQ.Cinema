@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 
@@ -36,6 +37,7 @@ type PointsState = {
 };
 
 export default function PointsPage() {
+  const { t } = useI18n();
   const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<PointsState | null>(null);
   const [cracking, setCracking] = useState(false);
@@ -66,8 +68,8 @@ export default function PointsPage() {
     if (!data?.ok) {
       setError(
         data?.error === "vip_required"
-          ? "Daily Drops is a VIP perk — subscribe to unlock it."
-          : "You've already opened today's box."
+          ? t("points.vipRequiredError")
+          : t("points.alreadyOpened")
       );
     } else {
       setCrackResult(data.points);
@@ -83,10 +85,10 @@ export default function PointsPage() {
     if (!data?.ok) {
       setError(
         data?.error === "insufficient_points"
-          ? "Not enough points yet."
+          ? t("points.notEnough")
           : data?.error === "vip_required"
-          ? "You need an active membership to redeem this."
-          : "Couldn't redeem that item."
+          ? t("points.needMembership")
+          : t("points.redeemFailed")
       );
     }
     refresh();
@@ -97,10 +99,10 @@ export default function PointsPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/rewards" aria-label="Back" className="text-text">
+        <Link href="/rewards" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Member Points</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("points.title")}</h1>
       </div>
 
       <div className="mt-4 flex items-center gap-2 rounded-full bg-surface-raised px-3 py-1.5 w-fit">
@@ -134,17 +136,17 @@ export default function PointsPage() {
           {crackResult !== null ? "🎉" : "🎁"}
         </div>
         <p className="font-display mt-3 text-[16px] font-semibold text-text">
-          {crackResult !== null ? `You won ${crackResult} points!` : "Daily Drops! Crack the Box!"}
+          {crackResult !== null ? t("points.youWon", { n: crackResult }) : t("points.crackTheBox")}
         </p>
         {crackResult === null && !loading && (
           <p className="mt-1 text-[12.5px] text-gold">
-            Win up to {state.box.max} points every day
+            {t("points.winUpTo", { n: state.box.max })}
           </p>
         )}
         {!loading && state.box.vip_only && !state.vip ? (
           <Link href="/wallet" className="mt-4 w-full max-w-[220px]">
             <Button variant="gold" className="w-full">
-              <Lock size={14} /> VIP required
+              <Lock size={14} /> {t("points.vipRequired")}
             </Button>
           </Link>
         ) : (
@@ -157,17 +159,17 @@ export default function PointsPage() {
             {loading
               ? "…"
               : state.box.opened_today
-              ? `Opened — +${state.box.points_today} today`
+              ? t("points.openedToday", { n: state.box.points_today ?? 0 })
               : cracking
-              ? "Opening…"
-              : "Unlock Now"}
+              ? t("points.opening")
+              : t("points.unlockNow")}
           </Button>
         )}
       </div>
 
       {/* Redemption */}
       <section className="mt-7">
-        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Redemption</h2>
+        <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("points.redemption")}</h2>
         <div className="space-y-2">
           {loading ? (
             <>
@@ -198,7 +200,7 @@ export default function PointsPage() {
                     disabled={!canAfford || redeemingId === item.id}
                     onClick={() => redeem(item)}
                   >
-                    {redeemingId === item.id ? "…" : "Redeem"}
+                    {redeemingId === item.id ? "…" : t("points.redeem")}
                   </Button>
                 </div>
               );
@@ -209,12 +211,12 @@ export default function PointsPage() {
 
       {!loading && state.redemptions.length > 0 && (
         <section className="mt-7 pb-4">
-          <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">Recent redemptions</h2>
+          <h2 className="font-display mb-2.5 text-[16px] font-semibold text-text">{t("points.recentRedemptions")}</h2>
           <div className="space-y-1.5">
             {state.redemptions.map((r) => (
               <div key={r.id} className="flex items-center justify-between text-[13px]">
                 <span className="text-text">{r.item_name}</span>
-                <span className="text-muted">-{r.cost_points.toLocaleString()} pts</span>
+                <span className="text-muted">-{t("points.pts", { n: r.cost_points.toLocaleString() })}</span>
               </div>
             ))}
           </div>

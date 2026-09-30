@@ -20,8 +20,10 @@ import { EmptyState } from "@/components/library/EmptyState";
 import { EditBar } from "@/components/library/EditBar";
 import { FolderCard } from "@/components/downloads/FolderCard";
 import { EpisodeRow } from "@/components/downloads/EpisodeRow";
+import { useI18n } from "@/hooks/useI18n";
 
 function DownloadsInner() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   const titleId = params.get("title");
@@ -78,22 +80,19 @@ function DownloadsInner() {
     setEditing(false);
   }
 
-  const unit = folder ? "episode" : "movie";
-  const confirmBody = folder
-    ? "They'll be removed from this device. You can download them again anytime you're online."
-    : "The whole folder will be removed from this device. You can download them again anytime you're online.";
+  const confirmBody = folder ? t("downloads.confirmEpisodes") : t("downloads.confirmMovies");
 
   return (
     <div className="fade-in px-4 pt-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 pb-3">
           {folder && (
-            <Link href="/downloads" aria-label="Back to Downloads" className="-ml-1 grid h-9 w-9 shrink-0 place-items-center text-text">
+            <Link href="/downloads" aria-label={t("downloads.backToDownloads")} className="-ml-1 grid h-9 w-9 shrink-0 place-items-center text-text">
               <ArrowLeft size={22} />
             </Link>
           )}
           <h1 className="truncate text-[21px] font-semibold leading-tight text-text">
-            {folder ? folder.title.title.trim() : "Downloads"}
+            {folder ? folder.title.title.trim() : t("downloads.title")}
           </h1>
         </div>
 
@@ -101,11 +100,11 @@ function DownloadsInner() {
           type="button"
           onClick={toggleEdit}
           disabled={!total && !editing}
-          aria-label={editing ? "Done editing" : "Edit downloads"}
+          aria-label={editing ? t("downloads.doneEditing") : t("downloads.edit")}
           className="-mt-0.5 grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-1 text-text transition-opacity disabled:opacity-30"
         >
           {editing ? (
-            <span className="px-2 text-[15px] font-semibold text-pink">Done</span>
+            <span className="px-2 text-[15px] font-semibold text-pink">{t("downloads.done")}</span>
           ) : (
             <SquarePen size={24} strokeWidth={1.75} />
           )}
@@ -115,8 +114,8 @@ function DownloadsInner() {
       {dl.ready && total > 0 && (
         <p className="-mt-2 text-[13px] text-muted">
           {folder
-            ? formatEpisodeCount(folder.episodes.length)
-            : `${dl.folders.length} ${dl.folders.length === 1 ? "movie" : "movies"}`}
+            ? formatEpisodeCount(folder.episodes.length, t)
+            : t(dl.folders.length === 1 ? "downloads.movie" : "downloads.movies", { n: dl.folders.length })}
         </p>
       )}
 
@@ -133,7 +132,7 @@ function DownloadsInner() {
       )}
 
       {dl.ready && !dl.folders.length && !titleId && (
-        <EmptyState message="Movies you download will show up here to watch offline." />
+        <EmptyState message={t("downloads.empty")} />
       )}
 
       {dl.ready && !folder && dl.folders.length > 0 && (
@@ -167,29 +166,32 @@ function DownloadsInner() {
         </div>
       )}
 
-      {dl.ready && total > 0 && <p className="mt-8 pb-2 text-center text-[15px] text-muted/70">--The End--</p>}
+      {dl.ready && total > 0 && <p className="mt-8 pb-2 text-center text-[15px] text-muted/70">{t("downloads.theEnd")}</p>}
 
       {editing && (
         <EditBar
           selectedCount={selected.size}
           total={total}
-          actionLabel="Delete"
+          actionLabel={t("downloads.delete")}
           onToggleAll={toggleAll}
           onAction={() => setConfirmOpen(true)}
         />
       )}
 
-      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Delete downloads">
+      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title={t("downloads.deleteTitle")}>
         <div className="px-5 pb-5">
           <p className="text-[14px] leading-relaxed text-muted">
-            {selected.size === 1 ? `1 ${unit}` : `${selected.size} ${unit}s`}. {confirmBody}
+            {t(folder ? "downloads.selectedEpisodes" : "downloads.selectedMovies", {
+              n: selected.size,
+              body: confirmBody,
+            })}
           </p>
           <div className="mt-5 flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" className="flex-1" onClick={removeSelected}>
-              Delete
+              {t("downloads.delete")}
             </Button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { CategoryTabs } from "@/components/home/CategoryTabs";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { PopularGrid } from "@/components/home/PopularGrid";
 import { HomeRefresh } from "@/components/home/HomeRefresh";
+import { NothingPublished } from "@/components/home/NothingPublished";
 
 export const revalidate = 60;
 
@@ -21,17 +22,19 @@ async function getHomeData({ tab, genre }: SearchParams) {
     .eq("status", "published")
     .limit(12);
 
-  let heading = "Popular Choices";
+  let headingKey: "home.popularChoices" | "home.newReleases" | "home.topRanking" | "home.genrePicks" = "home.popularChoices";
+  let headingGenre: string | undefined;
 
   if (activeTab === "new") {
     gridQuery = gridQuery.order("published_at", { ascending: false });
-    heading = "New Releases";
+    headingKey = "home.newReleases";
   } else if (activeTab === "ranking") {
     gridQuery = gridQuery.order("total_unique_views", { ascending: false });
-    heading = "Top Ranking";
+    headingKey = "home.topRanking";
   } else if (activeTab === "genre" && genre) {
     gridQuery = gridQuery.eq("genre", genre).order("total_unique_views", { ascending: false });
-    heading = `${genre} Picks`;
+    headingKey = "home.genrePicks";
+    headingGenre = genre;
   } else {
     gridQuery = gridQuery.order("total_unique_views", { ascending: false });
   }
@@ -92,7 +95,8 @@ async function getHomeData({ tab, genre }: SearchParams) {
     exclusive,
     gridTitles: gridTitles ?? [],
     genres,
-    heading,
+    headingKey,
+    headingGenre,
     activeTab,
     firstEpisodeByTitle,
   };
@@ -103,7 +107,7 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { featured, exclusive, gridTitles, genres, heading, activeTab, firstEpisodeByTitle } =
+  const { featured, exclusive, gridTitles, genres, headingKey, headingGenre, activeTab, firstEpisodeByTitle } =
     await getHomeData(searchParams);
 
   return (
@@ -135,7 +139,8 @@ export default async function HomePage({
           />
 
           <PopularGrid
-            heading={heading}
+            headingKey={headingKey}
+            headingGenre={headingGenre}
             titles={gridTitles.map((t) => ({
               ...t,
               first_episode_id: firstEpisodeByTitle.get(t.id) ?? null,
@@ -143,12 +148,7 @@ export default async function HomePage({
           />
 
           {!featured && !gridTitles.length && (
-            <div className="mt-16 px-6 text-center">
-              <p className="font-display text-lg text-text">Nothing published yet</p>
-              <p className="mt-1.5 text-sm text-muted">
-                Once creators publish titles, they'll show up here.
-              </p>
-            </div>
+            <NothingPublished />
           )}
         </div>
       </div>

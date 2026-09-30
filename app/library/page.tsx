@@ -19,17 +19,19 @@ import { SubscribeBanner } from "@/components/library/SubscribeBanner";
 import { PosterCard } from "@/components/library/PosterCard";
 import { HistoryRow } from "@/components/library/HistoryRow";
 import { EmptyState } from "@/components/library/EmptyState";
+import { useI18n } from "@/hooks/useI18n";
 
 type ReminderTab = "released" | "upcoming";
 
 const REMINDER_OPTIONS = [
-  { value: "released", label: "Released" },
-  { value: "upcoming", label: "Upcoming" },
+  { value: "released", label: "Released", labelKey: "library.released" },
+  { value: "upcoming", label: "Upcoming", labelKey: "library.upcoming" },
 ] as const;
 
 const supabase = createClient();
 
 export default function LibraryPage() {
+  const { t, lang } = useI18n();
   const { user, loading: authLoading } = useAuth();
 
   const [top, setTop] = useState<TopTab>("following");
@@ -49,7 +51,7 @@ export default function LibraryPage() {
     top === "reminders" ? null : category
   );
 
-  const groups = useMemo(() => (top === "history" && items ? groupByDay(items) : []), [top, items]);
+  const groups = useMemo(() => (top === "history" && items ? groupByDay(items, t, lang) : []), [top, items, t, lang]);
 
   function toggleFollow(titleId: string, next: boolean) {
     return mutate(
@@ -68,14 +70,14 @@ export default function LibraryPage() {
         <div className="mt-1">
           {top === "reminders" ? (
             <SegmentedControl
-              ariaLabel="Reminder status"
+              ariaLabel={t("library.reminderStatus")}
               options={REMINDER_OPTIONS}
               value={reminderTab}
               onChange={setReminderTab}
             />
           ) : (
             <SegmentedControl
-              ariaLabel="Category"
+              ariaLabel={t("library.category")}
               options={CATEGORIES}
               value={category}
               onChange={setCategory}
@@ -91,8 +93,8 @@ export default function LibraryPage() {
 
         {!user && !authLoading && (
           <EmptyState
-            message="Sign in to keep track of what you follow and watch."
-            actionLabel="Sign in"
+            message={t("library.signInPrompt")}
+            actionLabel={t("library.signIn")}
             href="/auth/login?next=/library"
           />
         )}
@@ -111,9 +113,9 @@ export default function LibraryPage() {
 
         {error && user && items === null && (
           <div className="mt-12 text-center">
-            <p className="text-sm text-muted">Couldn&apos;t load your list.</p>
+            <p className="text-sm text-muted">{t("library.loadError")}</p>
             <Button variant="secondary" size="sm" className="mt-3" onClick={refresh}>
-              Try again
+              {t("common.retry")}
             </Button>
           </div>
         )}

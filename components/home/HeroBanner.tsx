@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useI18n } from "@/hooks/useI18n";
 
 type HeroTitle = {
   slug: string;
@@ -24,6 +27,7 @@ export function HeroBanner({
   featured: HeroTitle | null;
   exclusive: HeroTitle | null;
 }) {
+  const { t } = useI18n();
   if (!featured) return null;
 
   return (
@@ -69,7 +73,7 @@ export function HeroBanner({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
           <span className="absolute left-1.5 top-1.5 rounded-sm bg-pink px-1.5 py-0.5 text-[9px] font-semibold text-white">
-            Exclusive
+            {t("home.exclusive")}
           </span>
           <p className="absolute inset-x-0 bottom-0 line-clamp-2 p-2 text-[12px] font-medium leading-tight text-white">
             {exclusive.title}

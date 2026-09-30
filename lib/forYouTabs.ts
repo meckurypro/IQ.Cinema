@@ -9,10 +9,10 @@
 //   collections promos filtered by category (Drama / Story / Anime)
 
 export const FOR_YOU_TABS = [
-  { key: "for_you", label: "For you" },
-  { key: "new", label: "New" },
-  { key: "trending", label: "Trending" },
-  { key: "collections", label: "Collections" },
+  { key: "for_you", label: "For you", labelKey: "foryou.tab.forYou" },
+  { key: "new", label: "New", labelKey: "foryou.tab.new" },
+  { key: "trending", label: "Trending", labelKey: "foryou.tab.trending" },
+  { key: "collections", label: "Collections", labelKey: "foryou.tab.collections" },
 ] as const;
 
 export type ForYouTab = (typeof FOR_YOU_TABS)[number]["key"];
@@ -27,9 +27,10 @@ export function rpcTabFor(tab: ForYouTab): "for_you" | "new" | "trending" {
   return tab === "collections" ? "for_you" : tab;
 }
 
-export const EMPTY_COPY: Record<ForYouTab, string> = {
-  for_you: "Nothing on For You yet — check back once creators have set a promo episode.",
-  new: "No new releases yet — fresh promos will land here first.",
-  trending: "Nothing is trending yet — watch and share a promo to get it moving.",
-  collections: "No promos in this collection yet.",
-};
+// i18n keys (see lib/i18n/messages.ts) — resolved with t() where rendered.
+export const EMPTY_COPY_KEY = {
+  for_you: "foryou.empty.forYou",
+  new: "foryou.empty.new",
+  trending: "foryou.empty.trending",
+  collections: "foryou.empty.collections",
+} as const satisfies Record<ForYouTab, string>;

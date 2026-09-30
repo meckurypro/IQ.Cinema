@@ -6,12 +6,13 @@ import { Sparkles } from "lucide-react";
 import clsx from "clsx";
 import { Button } from "@/components/ui/Button";
 import type { SubscriptionPlan } from "@/lib/store";
+import { useI18n } from "@/hooks/useI18n";
 
-const INTERVAL_LABEL: Record<SubscriptionPlan["interval"], string> = {
-  weekly: "week",
-  monthly: "month",
-  annual: "year",
-};
+const INTERVAL_KEY = {
+  weekly: "wallet.week",
+  monthly: "wallet.month",
+  annual: "wallet.year",
+} as const;
 
 export function SubscriptionCard({
   plan,
@@ -24,6 +25,8 @@ export function SubscriptionCard({
   onSubscribe: (id: string) => void;
   loading: boolean;
 }) {
+  const { t, lang } = useI18n();
+  const interval = t(INTERVAL_KEY[plan.interval]);
   const showIntro = plan.intro_eligible && plan.intro_price_naira != null;
   const price = showIntro ? plan.intro_price_naira! : plan.price_naira;
 
@@ -56,16 +59,19 @@ export function SubscriptionCard({
       </p>
       {showIntro && (
         <p className="text-[11.5px] text-muted">
-          ₦{plan.intro_price_naira!.toLocaleString()} for the first {plan.interval}, then ₦
-          {plan.price_naira.toLocaleString()}/{INTERVAL_LABEL[plan.interval]}
+          {t("wallet.introPrice", {
+            intro: plan.intro_price_naira!.toLocaleString(lang),
+            price: plan.price_naira.toLocaleString(lang),
+            interval,
+          })}
         </p>
       )}
-      <p className="text-[11.5px] text-muted">Auto renew · Cancel anytime</p>
+      <p className="text-[11.5px] text-muted">{t("wallet.autoRenew")}</p>
 
       {plan.ai_generations != null && plan.ai_generations > 0 && (
         <div className="mt-3 flex items-center gap-1.5 rounded-md bg-surface-raised px-3 py-2 text-[12.5px] text-text">
           <Sparkles size={14} className="text-pink" />
-          {plan.ai_generations} AI generations/{INTERVAL_LABEL[plan.interval]}
+          {t("wallet.aiGenerations", { n: plan.ai_generations, interval })}
         </div>
       )}
 
@@ -75,7 +81,7 @@ export function SubscriptionCard({
         disabled={loading}
         onClick={() => onSubscribe(plan.id)}
       >
-        {loading ? "Starting…" : "Subscribe"}
+        {loading ? t("wallet.starting") : t("wallet.subscribe")}
       </Button>
     </div>
   );

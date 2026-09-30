@@ -8,12 +8,14 @@ import { ChevronRight, Crown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 const known = new Map<string, boolean>();
 
 // Promo strip that only shows for people without an active subscription.
 export function SubscribeBanner() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const userId = user?.id;
   const [subscribed, setSubscribed] = useState<boolean | null>(() =>
@@ -52,7 +54,7 @@ export function SubscribeBanner() {
     >
       <Crown size={22} className="shrink-0 fill-[#3b2a0b]/15" strokeWidth={1.75} />
       <span className="flex-1 text-[16px] font-semibold tracking-tight">
-        Unlimited access to all series
+        {t("library.unlimitedAccess")}
       </span>
       <span aria-hidden className="h-2 w-2 rounded-full bg-pink" />
       <ChevronRight size={20} />

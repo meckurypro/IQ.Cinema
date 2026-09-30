@@ -10,8 +10,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { useI18n } from "@/hooks/useI18n";
+import { translateAuthError } from "@/lib/i18n/authErrors";
 
 export default function SignupPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const supabase = createClient();
   const [username, setUsername] = useState("");
@@ -45,7 +48,7 @@ export default function SignupPage() {
     setLoading(false);
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(translateAuthError(signUpError.message, t));
       return;
     }
 
@@ -72,10 +75,9 @@ export default function SignupPage() {
   if (awaitingConfirmation) {
     return (
       <div className="flex min-h-dvh flex-col justify-center px-6 fade-in">
-        <h1 className="font-display text-3xl font-semibold text-text">Check your email</h1>
+        <h1 className="font-display text-3xl font-semibold text-text">{t("auth.checkYourEmail")}</h1>
         <p className="mt-1.5 text-sm text-muted">
-          We sent a confirmation link to <span className="font-medium text-text">{email}</span>.
-          Click it to finish creating your account.
+          {t("auth.confirmationSent", { email })}
         </p>
         <div className="mt-7 space-y-3">
           <Button
@@ -86,11 +88,11 @@ export default function SignupPage() {
             disabled={resending || resent}
             onClick={handleResend}
           >
-            {resent ? "Sent!" : resending ? "Resending…" : "Resend email"}
+            {resent ? t("auth.sent") : resending ? t("auth.resending") : t("auth.resendEmail")}
           </Button>
           <p className="text-center text-sm text-muted">
             <Link href="/auth/login" className="font-medium text-text underline underline-offset-4">
-              Back to sign in
+              {t("auth.backToSignIn")}
             </Link>
           </p>
         </div>
@@ -100,13 +102,13 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-dvh flex-col justify-center px-6 fade-in">
-      <h1 className="font-display text-3xl font-semibold text-text">Create your account</h1>
-      <p className="mt-1.5 text-sm text-muted">Join IQ Cinema — free to watch, free to sign up.</p>
+      <h1 className="font-display text-3xl font-semibold text-text">{t("auth.createYourAccount")}</h1>
+      <p className="mt-1.5 text-sm text-muted">{t("auth.joinTagline")}</p>
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-3">
         <input
           required
-          placeholder="Username"
+          placeholder={t("auth.username")}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[15px] text-text placeholder:text-muted"
@@ -114,7 +116,7 @@ export default function SignupPage() {
         <input
           type="email"
           required
-          placeholder="Email"
+          placeholder={t("auth.email")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[15px] text-text placeholder:text-muted"
@@ -122,20 +124,20 @@ export default function SignupPage() {
         <PasswordInput
           required
           minLength={6}
-          placeholder="Password"
+          placeholder={t("auth.password")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <p className="text-[13px] text-crimson">{error}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? "Creating account…" : "Create account"}
+          {loading ? t("auth.creatingAccount") : t("auth.createAccount")}
         </Button>
       </form>
 
       <p className="mt-5 text-center text-sm text-muted">
-        Already have an account?{" "}
+        {t("auth.alreadyHaveAccount")}{" "}
         <Link href="/auth/login" className="font-medium text-text underline underline-offset-4">
-          Sign in
+          {t("auth.signIn")}
         </Link>
       </p>
     </div>

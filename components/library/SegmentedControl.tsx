@@ -2,6 +2,9 @@
 
 "use client";
 
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
+
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -9,7 +12,7 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   tone = "themed",
 }: {
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; labelKey?: MessageKey }[];
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
@@ -18,6 +21,7 @@ export function SegmentedControl<T extends string>({
   // sliding-thumb motion are identical.
   tone?: "themed" | "overlay";
 }) {
+  const { t } = useI18n();
   const overlay = tone === "overlay";
   const index = Math.max(
     0,
@@ -59,7 +63,7 @@ export function SegmentedControl<T extends string>({
                 : "text-muted"
           }`}
         >
-          {option.label}
+          {option.labelKey ? t(option.labelKey) : option.label}
         </button>
       ))}
     </div>

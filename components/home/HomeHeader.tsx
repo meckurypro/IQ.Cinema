@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Search } from "lucide-react";
+import { useI18n } from "@/hooks/useI18n";
 
 export function HomeHeader() {
   const router = useRouter();
+  const { t } = useI18n();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -23,7 +25,7 @@ export function HomeHeader() {
           <input
             name="q"
             type="text"
-            placeholder="Search titles..."
+            placeholder={t("home.searchPlaceholder")}
             className="w-full bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
         </label>

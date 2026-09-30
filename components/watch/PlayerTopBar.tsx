@@ -4,6 +4,7 @@
 
 import { ArrowLeft, Gauge, MoreHorizontal } from "lucide-react";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 export function PlayerTopBar({
   episodeNumber,
@@ -24,6 +25,7 @@ export function PlayerTopBar({
   onOpenMore: () => void;
   visible?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className={clsx(
@@ -36,7 +38,7 @@ export function PlayerTopBar({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back"
+          aria-label={t("common.back")}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white"
         >
           <ArrowLeft size={18} />
@@ -57,12 +59,12 @@ export function PlayerTopBar({
           className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[13px] font-semibold text-white"
         >
           <Gauge size={15} />
-          {speed === 1 ? "Speed" : `${speed}x`}
+          {speed === 1 ? t("watch.speed") : `${speed}x`}
         </button>
         <button
           type="button"
           onClick={onOpenMore}
-          aria-label="More options"
+          aria-label={t("watch.moreOptions")}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white"
         >
           <MoreHorizontal size={18} />
