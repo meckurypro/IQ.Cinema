@@ -12,8 +12,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function CreatorApplyPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const router = useRouter();
   const supabase = createClient();
@@ -65,12 +67,12 @@ export default function CreatorApplyPage() {
   if (done) {
     return (
       <div className="flex min-h-[70dvh] flex-col items-center justify-center px-8 text-center fade-in">
-        <p className="font-display text-xl font-semibold text-text">Application sent</p>
+        <p className="font-display text-xl font-semibold text-text">{t("creator.applicationSent")}</p>
         <p className="mt-2 text-sm text-muted">
-          We'll review your application and let you know. This usually takes a few days.
+          {t("creator.applicationSentBody")}
         </p>
         <Link href="/profile" className="mt-5">
-          <Button variant="secondary">Back to profile</Button>
+          <Button variant="secondary">{t("creator.backToProfile")}</Button>
         </Link>
       </div>
     );
@@ -79,20 +81,19 @@ export default function CreatorApplyPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/profile" aria-label="Back" className="text-text">
+        <Link href="/profile" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Become a creator</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("creator.becomeCreator")}</h1>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-muted">
-        Tell us about what you make. Approved creators can upload titles; earnings unlock fully
-        once you reach Partner Program milestones.
+        {t("creator.applyIntro")}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-3">
         <textarea
           required
-          placeholder="Tell us about your work"
+          placeholder={t("creator.aboutWork")}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           rows={4}
@@ -108,7 +109,7 @@ export default function CreatorApplyPage() {
             )}
           >
             <option value="" disabled>
-              Primary genre
+              {t("creator.primaryGenre")}
             </option>
             {genres.map((genre) => (
               <option key={genre} value={genre}>
@@ -122,20 +123,20 @@ export default function CreatorApplyPage() {
           />
         </div>
         <input
-          placeholder="Portfolio link (optional)"
+          placeholder={t("creator.portfolioLink")}
           value={portfolioUrl}
           onChange={(e) => setPortfolioUrl(e.target.value)}
           className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
         />
         <input
-          placeholder="Sample content link"
+          placeholder={t("creator.sampleLink")}
           value={sampleUrl}
           onChange={(e) => setSampleUrl(e.target.value)}
           className="h-12 w-full rounded-md border border-border bg-surface px-4 text-[14px] text-text placeholder:text-muted"
         />
         {error && <p className="text-[13px] text-crimson">{error}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={submitting}>
-          {submitting ? "Submitting…" : "Submit application"}
+          {submitting ? t("creator.submitting") : t("creator.submitApplication")}
         </Button>
       </form>
     </div>

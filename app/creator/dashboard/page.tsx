@@ -12,6 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useI18n } from "@/hooks/useI18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type Eligibility = {
   eligible: boolean;
@@ -40,17 +42,18 @@ function unwrapEligibility(data: unknown): Eligibility | null {
   return (data as Eligibility) ?? null;
 }
 
-const TITLE_STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  in_review: "In review",
-  published: "Live",
-  coming_soon: "Coming soon",
-  suspended: "Suspended",
-  rejected: "Rejected",
-  withdrawn: "Withdrawn",
+const TITLE_STATUS_KEY: Record<string, MessageKey> = {
+  draft: "creator.status.draft",
+  in_review: "creator.status.in_review",
+  published: "creator.status.published",
+  coming_soon: "creator.status.coming_soon",
+  suspended: "creator.status.suspended",
+  rejected: "creator.status.rejected",
+  withdrawn: "creator.status.withdrawn",
 };
 
 function ProgressRow({ label, value, target }: { label: string; value: number; target: number }) {
+  const { lang } = useI18n();
   const safeValue = value ?? 0;
   const safeTarget = target ?? 0;
   const pct = Math.min(100, Math.round((safeValue / Math.max(safeTarget, 1)) * 100));
@@ -59,7 +62,7 @@ function ProgressRow({ label, value, target }: { label: string; value: number; t
       <div className="flex items-center justify-between text-[12px]">
         <span className="text-muted">{label}</span>
         <span className="text-text">
-          {safeValue.toLocaleString()} / {safeTarget.toLocaleString()}
+          {safeValue.toLocaleString(lang)} / {safeTarget.toLocaleString(lang)}
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-raised">
@@ -70,6 +73,7 @@ function ProgressRow({ label, value, target }: { label: string; value: number; t
 }
 
 export default function CreatorDashboardPage() {
+  const { t, lang } = useI18n();
   const { user, profile } = useAuth();
   const { wallet } = useWallet(user?.id);
   const supabase = createClient();
@@ -133,23 +137,23 @@ export default function CreatorDashboardPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-semibold text-text">Creator dashboard</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{t("creator.dashboard")}</h1>
         <Link href="/creator/upload">
           <Button size="sm">
-            <Plus size={15} /> Upload
+            <Plus size={15} /> {t("creator.upload")}
           </Button>
         </Link>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-md border border-border bg-surface p-3.5">
-          <p className="text-[11px] text-muted">Available balance</p>
+          <p className="text-[11px] text-muted">{t("creator.availableBalance")}</p>
           <p className="mt-1 text-[19px] font-semibold text-text">
             ₦{(wallet?.earnings_balance_naira ?? 0).toLocaleString()}
           </p>
         </div>
         <div className="rounded-md border border-border bg-surface p-3.5">
-          <p className="text-[11px] text-muted">In escrow</p>
+          <p className="text-[11px] text-muted">{t("creator.inEscrow")}</p>
           <p className="mt-1 text-[19px] font-semibold text-text">
             ₦{(wallet?.escrow_balance_naira ?? 0).toLocaleString()}
           </p>
@@ -159,34 +163,34 @@ export default function CreatorDashboardPage() {
       {isPartner ? (
         <Link href="/creator/withdraw">
           <Button variant="primary" className="mt-3 w-full">
-            Request withdrawal
+            {t("creator.requestWithdrawal")}
           </Button>
         </Link>
       ) : (
         <div className="mt-5 rounded-md border border-border bg-surface p-4">
-          <p className="text-[14px] font-semibold text-text">Partner Program progress</p>
+          <p className="text-[14px] font-semibold text-text">{t("creator.partnerProgress")}</p>
           <p className="mt-1 text-[12px] text-muted">
-            Hit every milestone below to apply. Earnings stay in escrow until you're approved.
+            {t("creator.partnerHint")}
           </p>
           {eligibility ? (
             <div className="mt-3 space-y-2.5">
               <ProgressRow
-                label="Unique views"
+                label={t("creator.uniqueViews")}
                 value={eligibility.unique_views}
                 target={eligibility.unique_views_required}
               />
               <ProgressRow
-                label="Watch hours"
+                label={t("creator.watchHours")}
                 value={eligibility.watch_hours}
                 target={eligibility.watch_hours_required}
               />
               <ProgressRow
-                label="Episodes published"
+                label={t("creator.episodesPublished")}
                 value={eligibility.episode_count}
                 target={eligibility.episode_count_required}
               />
               <ProgressRow
-                label="Account age (days)"
+                label={t("creator.accountAgeDays")}
                 value={eligibility.account_age_days}
                 target={eligibility.account_age_required}
               />
@@ -195,7 +199,7 @@ export default function CreatorDashboardPage() {
                 disabled={!eligibility.eligible || applyingPartner}
                 onClick={applyForPartner}
               >
-                {eligibility.eligible ? "Apply for Partner Program" : "Not yet eligible"}
+                {eligibility.eligible ? t("creator.applyPartner") : t("creator.notEligible")}
               </Button>
             </div>
           ) : (
@@ -204,27 +208,27 @@ export default function CreatorDashboardPage() {
         </div>
       )}
 
-      <h2 className="font-display mt-7 mb-2.5 text-[17px] font-semibold text-text">Your titles</h2>
+      <h2 className="font-display mt-7 mb-2.5 text-[17px] font-semibold text-text">{t("creator.yourTitles")}</h2>
       <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
-        {titles.map((t) => (
-          <li key={t.id}>
-            <Link href={`/creator/title/${t.id}`} className="flex items-center justify-between px-4 py-3">
+        {titles.map((row) => (
+          <li key={row.id}>
+            <Link href={`/creator/title/${row.id}`} className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="text-[14px] font-medium text-text">{t.title}</p>
+                <p className="text-[14px] font-medium text-text">{row.title}</p>
                 <p className="mt-0.5 text-[12px] text-muted">
-                  {TITLE_STATUS_LABEL[t.status] ?? t.status}
-                  {t.genre ? ` · ${t.genre}` : ""}
+                  {TITLE_STATUS_KEY[row.status] ? t(TITLE_STATUS_KEY[row.status]) : row.status}
+                  {row.genre ? ` · ${row.genre}` : ""}
                 </p>
               </div>
               <span className="flex items-center gap-1 text-[12px] text-muted">
                 <Zap size={11} className="fill-gold text-gold" />
-                {t.total_unique_views}
+                {row.total_unique_views}
               </span>
             </Link>
           </li>
         ))}
         {!titles.length && (
-          <li className="px-4 py-6 text-center text-sm text-muted">No titles uploaded yet.</li>
+          <li className="px-4 py-6 text-center text-sm text-muted">{t("creator.noTitles")}</li>
         )}
       </ul>
     </div>
