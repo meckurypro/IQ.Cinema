@@ -11,5 +11,9 @@ import clsx from "clsx";
 export function AppMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const fullScreen = pathname.startsWith("/for-you");
-  return <main className={clsx("flex-1", !fullScreen && "pb-20")}>{children}</main>;
+  // Video pages fill the viewport on desktop too (they have no bottom bar there).
+  const immersive = fullScreen || pathname.startsWith("/watch/") || pathname.startsWith("/downloads/play");
+  // The bottom tab bar only exists below the `desk` breakpoint, so the
+  // reserved room goes with it.
+  return <main className={clsx("flex-1", !fullScreen && "pb-20", immersive ? "desk:pb-0" : "desk:pb-10")}>{children}</main>;
 }

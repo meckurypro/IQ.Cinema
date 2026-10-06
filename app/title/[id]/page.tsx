@@ -86,8 +86,8 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
   const defaultCost = settings?.default_episode_unlock_coins ?? 30;
 
   return (
-    <div className="fade-in">
-      <div className="relative aspect-[9/16] w-full">
+    <div className="fade-in desk:grid desk:grid-cols-[minmax(0,380px)_1fr] desk:items-start desk:gap-12 desk:pt-8">
+      <div className="relative aspect-[9/16] w-full desk:overflow-hidden desk:rounded-xl">
         {title.banner_url || title.poster_url ? (
           <Image
             src={title.banner_url ?? title.poster_url!}
@@ -97,15 +97,15 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
             className="object-cover"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-black/30 desk:from-black/25" />
       </div>
 
       {/* Sits below the poster, not over it. A negative top margin used to pull
           this block up under the poster's absolutely-positioned layers, which
           paint above non-positioned siblings — that covered the top of the
           title. The poster's own gradient already fades into the page. */}
-      <div className="px-4 pb-8 pt-6">
-        <h1 className="font-display text-[22px] font-semibold leading-tight text-text">
+      <div className="px-4 pb-8 pt-6 desk:px-0 desk:pt-2">
+        <h1 className="font-display text-[22px] font-semibold leading-tight text-text desk:text-[36px]">
           {title.title}
         </h1>
         <TitleMeta
@@ -115,9 +115,10 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         />
 
         {title.synopsis && (
-          <p className="mt-3 text-[14px] leading-relaxed text-text/85">{title.synopsis}</p>
+          <p className="mt-3 text-[14px] leading-relaxed text-text/85 desk:mt-5 desk:max-w-2xl desk:text-[16px]">{title.synopsis}</p>
         )}
 
+        <div className="desk:max-w-xl">
         <TitleActions
           titleId={title.id}
           slug={title.slug}
@@ -126,6 +127,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
           freeCount={freeCount}
           defaultCost={defaultCost}
         />
+        </div>
       </div>
     </div>
   );

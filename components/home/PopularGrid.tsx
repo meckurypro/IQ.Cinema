@@ -26,11 +26,11 @@ export function PopularGrid({
   }
 
   return (
-    <section className="mt-6 px-4">
-      <h2 className="font-display mb-3 text-[19px] font-semibold text-text">
+    <section className="mt-6 px-4 desk:mt-8 desk:px-0">
+      <h2 className="font-display mb-3 text-[19px] font-semibold text-text desk:mb-5 desk:text-[24px]">
         {t(headingKey, { genre: headingGenre ?? "" })}
       </h2>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-5">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 desk:grid-cols-4 desk:gap-x-5 desk:gap-y-8 xl:grid-cols-6">
         {titles.map((title, i) => (
           <PopularCard key={title.id} title={title} rank={i + 1} />
         ))}

@@ -33,8 +33,8 @@ export function PosterCard({
             src={item.poster_url}
             alt={item.title}
             fill
-            sizes="(max-width: 448px) 33vw, 150px"
-            className="object-cover transition-transform duration-300 group-active:scale-95"
+            sizes="(min-width: 1280px) 16vw, (min-width: 768px) 18vw, 150px"
+            className="object-cover transition-transform duration-300 group-active:scale-95 desk:group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-muted">{t("common.poster.none")}</div>

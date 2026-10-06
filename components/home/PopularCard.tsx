@@ -26,8 +26,8 @@ export function PopularCard({ title, rank }: { title: PopularCardData; rank: num
             src={title.poster_url}
             alt={title.title}
             fill
-            sizes="240px"
-            className="object-cover transition-transform duration-300 group-active:scale-95"
+            sizes="(min-width: 1280px) 16vw, (min-width: 768px) 22vw, 240px"
+            className="object-cover transition-transform duration-300 group-active:scale-95 desk:group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-muted">{t("common.poster.none")}</div>

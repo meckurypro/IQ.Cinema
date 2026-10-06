@@ -23,6 +23,8 @@ import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
 import { ForYouHeader } from "@/components/foryou/ForYouHeader";
 import { ForYouSearch, type SearchPromo } from "@/components/foryou/ForYouSearch";
 import { useI18n } from "@/hooks/useI18n";
+import { useFeedKeyboard } from "@/hooks/useFeedKeyboard";
+import { FeedNavArrows } from "@/components/shared/FeedNavArrows";
 
 type PromoItem = {
   episode_id: string;
@@ -488,6 +490,8 @@ export function ForYouFeed() {
     if (data?.id) setFullEpisodeId(data.id);
   }
 
+  useFeedKeyboard(containerRef, !fullEpisodeId && !showSearch);
+
   const header = (
     <ForYouHeader
       tab={tab}
@@ -500,7 +504,7 @@ export function ForYouFeed() {
 
   if (!items) {
     return (
-      <div className="relative h-dvh w-full overflow-hidden bg-black">
+      <div className="relative mx-auto h-dvh w-full overflow-hidden bg-black desk:max-w-[calc(100dvh*9/16)]">
         {header}
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-white" />
@@ -512,7 +516,9 @@ export function ForYouFeed() {
   const active = items.find((i) => i.episode_id === activeId) ?? items[0];
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black">
+    <div className="relative h-dvh w-full bg-black">
+      <FeedNavArrows containerRef={containerRef} />
+      <div className="relative mx-auto h-full w-full overflow-hidden bg-black desk:max-w-[calc(100dvh*9/16)]">
       {header}
       <ForYouSearch open={showSearch} onClose={() => setShowSearch(false)} onSelect={openSearchResult} />
       <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
@@ -649,7 +655,7 @@ export function ForYouFeed() {
       </div>
 
       {fullEpisodeId && (
-        <div className="fixed inset-0 z-40 mx-auto max-w-md bg-black">
+        <div className="fixed inset-0 z-40 mx-auto max-w-md bg-black desk:left-[72px] desk:right-0 desk:max-w-none xl:left-60">
           <EpisodeFeed
             key={fullEpisodeId}
             initialEpisodeId={fullEpisodeId}
@@ -703,6 +709,7 @@ export function ForYouFeed() {
           />
         </>
       )}
+      </div>
     </div>
   );
 }

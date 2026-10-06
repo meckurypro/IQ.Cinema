@@ -18,8 +18,8 @@ export function HomeHeader() {
   }
 
   return (
-    <header className="flex items-center gap-2 px-4 pt-5">
-      <form onSubmit={handleSubmit} className="flex-1">
+    <header className="flex items-center gap-2 px-4 pt-5 desk:px-0 desk:pt-8">
+      <form onSubmit={handleSubmit} className="flex-1 desk:max-w-xl">
         <label className="flex h-10 items-center gap-2 rounded-full border border-border bg-surface px-3.5">
           <Search size={16} className="shrink-0 text-muted" />
           <input
@@ -36,7 +36,7 @@ export function HomeHeader() {
         alt="IQ Cinema"
         width={38}
         height={38}
-        className="shrink-0"
+        className="shrink-0 desk:hidden"
         priority
       />
     </header>
