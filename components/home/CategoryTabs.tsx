@@ -47,7 +47,7 @@ export function CategoryTabs({
   }, [activeKey]);
 
   return (
-    <div className="relative flex items-center gap-5 px-4 pb-3 pt-4">
+    <div className="relative flex items-center gap-5 px-4 pb-3 pt-4 desk:gap-8 desk:px-0">
       {staticTabs.map(({ key, labelKey }) => {
         const active = activeTab === key;
         return (
@@ -58,7 +58,7 @@ export function CategoryTabs({
             }}
             href={key === "popular" ? "/" : `/?tab=${key}`}
             className={clsx(
-              "text-[16px] font-extrabold uppercase tracking-wide transition-colors",
+              "text-[16px] font-extrabold uppercase tracking-wide transition-colors hover:text-text",
               active ? "text-text" : "text-muted"
             )}
           >

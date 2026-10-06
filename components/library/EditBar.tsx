@@ -26,10 +26,10 @@ export function EditBar({
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md border-t border-border bg-surface/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md border-t desk:left-[72px] desk:max-w-none xl:left-60 border-border bg-surface/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="flex h-16 items-center justify-between gap-3 px-4">
+      <div className="flex h-16 items-center justify-between gap-3 px-4 desk:mx-auto desk:max-w-7xl desk:px-10">
         <button
           type="button"
           onClick={onToggleAll}

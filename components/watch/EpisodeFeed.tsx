@@ -23,6 +23,8 @@ import { CommentsSheet } from "@/components/watch/CommentsSheet";
 import { EpisodeTray, type TrayEpisode } from "@/components/watch/EpisodeTray";
 import { TitleDetailsSheet } from "@/components/watch/TitleDetailsSheet";
 import { useI18n } from "@/hooks/useI18n";
+import { useFeedKeyboard } from "@/hooks/useFeedKeyboard";
+import { FeedNavArrows } from "@/components/shared/FeedNavArrows";
 
 type FeedEpisode = {
   id: string;
@@ -504,6 +506,8 @@ export function EpisodeFeed({
     );
   }
 
+  useFeedKeyboard(containerRef);
+
   if (!episodes) {
     return <div className="h-dvh bg-black" />;
   }
@@ -517,7 +521,9 @@ export function EpisodeFeed({
   }));
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black">
+    <div className="relative h-dvh w-full bg-black">
+      <FeedNavArrows containerRef={containerRef} />
+      <div className="relative mx-auto h-full w-full overflow-hidden bg-black desk:max-w-[calc(100dvh*9/16)]">
       <div ref={containerRef} className="no-scrollbar absolute inset-0 snap-y snap-mandatory overflow-y-auto">
         {episodes.map((ep) => {
           const unlocked = isUnlocked(ep);
@@ -718,6 +724,7 @@ export function EpisodeFeed({
         contentRating={titleData?.content_rating}
         posterUrl={titleData?.poster_url}
       />
+      </div>
     </div>
   );
 }

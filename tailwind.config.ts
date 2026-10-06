@@ -1,3 +1,4 @@
+import plugin from "tailwindcss/plugin";
 // tailwind.config.ts
 
 import type { Config } from "tailwindcss";
@@ -36,6 +37,14 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `desk:` = a screen both wide and tall enough for the desktop layout
+    // (sidebar, centred feed). The height guard keeps a phone held in
+    // landscape on the mobile layout. A plugin variant (not a `screens`
+    // entry) so Tailwind's min-[...] / max-[...] variants keep working.
+    plugin(({ addVariant }) => {
+      addVariant("desk", "@media (min-width: 768px) and (min-height: 480px)");
+    }),
+  ],
 };
 export default config;

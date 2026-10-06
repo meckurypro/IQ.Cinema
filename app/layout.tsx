@@ -3,8 +3,7 @@
 import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ThemeScript } from "@/components/shared/ThemeScript";
-import { BottomNav } from "@/components/shared/BottomNav";
-import { AppMain } from "@/components/shared/AppMain";
+import { AppShell } from "@/components/shared/AppShell";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
 import { UserSettingsProvider } from "@/hooks/useUserSettings";
@@ -51,10 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <UserSettingsProvider>
             <I18nProvider>
               <NotificationListener />
-              <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
-                <AppMain>{children}</AppMain>
-                <BottomNav />
-              </div>
+              <AppShell>{children}</AppShell>
             </I18nProvider>
           </UserSettingsProvider>
         </AuthProvider>

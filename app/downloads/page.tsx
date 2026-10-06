@@ -120,7 +120,7 @@ function DownloadsInner() {
       )}
 
       {!dl.ready && (
-        <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-5">
+        <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 desk:grid-cols-5 desk:gap-x-5 desk:gap-y-8 xl:grid-cols-6">
           {[1, 2, 3].map((i) => (
             <div key={i}>
               <Skeleton className="aspect-[3/4] w-full rounded-lg" />
@@ -136,7 +136,7 @@ function DownloadsInner() {
       )}
 
       {dl.ready && !folder && dl.folders.length > 0 && (
-        <div className="fade-in mt-5 grid grid-cols-3 gap-x-3 gap-y-5" style={{ paddingBottom: editing ? "4.5rem" : 0 }}>
+        <div className="fade-in mt-5 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 desk:grid-cols-5 desk:gap-x-5 desk:gap-y-8 xl:grid-cols-6" style={{ paddingBottom: editing ? "4.5rem" : 0 }}>
           {dl.folders.map((f) => (
             <FolderCard
               key={f.title.titleId}

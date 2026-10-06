@@ -64,7 +64,7 @@ export default function LibraryPage() {
 
   return (
     <PullToRefresh onRefresh={refresh}>
-      <div className="fade-in px-4 pt-3">
+      <div className="fade-in px-4 pt-3 desk:px-0 desk:pt-8">
         <LibraryTabs value={top} onChange={setTop} />
 
         <div className="mt-1">
@@ -100,7 +100,7 @@ export default function LibraryPage() {
         )}
 
         {showSkeleton && user && (
-          <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-5">
+          <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 desk:grid-cols-5 desk:gap-x-5 desk:gap-y-8 xl:grid-cols-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i}>
                 <Skeleton className="aspect-[3/4] w-full rounded-lg" />
@@ -145,7 +145,7 @@ export default function LibraryPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+              <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 desk:grid-cols-5 desk:gap-x-5 desk:gap-y-8 xl:grid-cols-6">
                 {items.map((item) => (
                   <PosterCard
                     key={item.title_id}

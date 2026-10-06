@@ -64,6 +64,16 @@ export function BottomSheet({
     };
   }, [open]);
 
+  // Escape closes the dialog (desktop keyboard users).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") runCloseRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   // Lock background scroll while the sheet is up.
   useEffect(() => {
     if (!open) return;
@@ -121,7 +131,7 @@ export function BottomSheet({
   if (!mounted || (!open && !closing)) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 desk:flex desk:items-center desk:justify-center desk:p-6">
       <div
         onClick={runClose}
         className={clsx(
@@ -133,6 +143,8 @@ export function BottomSheet({
         ref={sheetRef}
         className={clsx(
           "absolute inset-x-0 bottom-0 mx-auto max-w-md rounded-t-xl border-t border-border bg-surface shadow-card",
+          // Desktop: a centred dialog instead of a bottom sheet.
+          "desk:relative desk:inset-auto desk:mx-0 desk:w-full desk:max-w-lg desk:rounded-xl desk:border",
           !closing && dragY === 0 && "sheet-up"
         )}
         style={{
@@ -146,9 +158,9 @@ export function BottomSheet({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="flex cursor-grab touch-none flex-col items-center pt-2.5 pb-1 active:cursor-grabbing"
+          className="flex cursor-grab touch-none flex-col items-center pt-2.5 pb-1 active:cursor-grabbing desk:cursor-default desk:pt-4"
         >
-          <div className="h-1 w-9 rounded-full bg-border" />
+          <div className="h-1 w-9 rounded-full bg-border desk:hidden" />
           {title && (
             <p className="mt-2 pb-1 text-[15px] font-semibold text-text">{title}</p>
           )}
