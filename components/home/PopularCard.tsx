@@ -33,14 +33,14 @@ export function PopularCard({ title, rank }: { title: PopularCardData; rank: num
           <div className="flex h-full items-center justify-center text-xs text-muted">{t("common.poster.none")}</div>
         )}
         <span className="absolute right-1.5 top-1.5 rounded-sm bg-crimson px-1.5 py-0.5 text-[10px] font-semibold text-white">
-          Hot
+          {t("home.hot")}
         </span>
       </div>
 
       <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-tight text-text">
         {title.title}
       </p>
-      <p className="mt-0.5 text-[11px] font-medium text-pink">Daily list No. {rank}</p>
+      <p className="mt-0.5 text-[11px] font-medium text-pink">{t("home.dailyList", { n: rank })}</p>
     </Link>
   );
 }

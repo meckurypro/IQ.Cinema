@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
 import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 export default function CreatorApplyPage() {
   const { t } = useI18n();
@@ -54,7 +55,7 @@ export default function CreatorApplyPage() {
     });
 
     if (insertError) {
-      setError(insertError.message);
+      setError(translateRuntimeError(insertError.message, t));
       setSubmitting(false);
       return;
     }

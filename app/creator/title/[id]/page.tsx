@@ -18,6 +18,7 @@ import clsx from "clsx";
 import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { TagPicker } from "@/components/creator/TagPicker";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 type TitleStatus =
   | "draft"
@@ -155,7 +156,7 @@ export default function ManageTitlePage() {
       const path = `${user.id}/${crypto.randomUUID()}-${editPosterFile.name}`;
       const { error: upErr } = await supabase.storage.from("posters").upload(path, editPosterFile);
       if (upErr) {
-        setError(upErr.message);
+        setError(translateRuntimeError(upErr.message, t));
         setSavingDetails(false);
         return;
       }
@@ -194,7 +195,7 @@ export default function ManageTitlePage() {
         const { error: tagErr } = await supabase
           .from("title_genres")
           .insert(gRows.map((g) => ({ title_id: title.id, genre_id: g.id })));
-        if (tagErr) setError(tagErr.message);
+        if (tagErr) setError(translateRuntimeError(tagErr.message, t));
       }
     }
     setSavingDetails(false);

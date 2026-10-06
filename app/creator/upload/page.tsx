@@ -24,6 +24,7 @@ import { CONTENT_RATINGS, type ContentRating } from "@/lib/contentRatings";
 import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { TagPicker } from "@/components/creator/TagPicker";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 // ---------------------------------------------------------------------------
 // Content-type config: duration cap (seconds) + what an upload "unit" is called
@@ -285,7 +286,7 @@ export default function UploadPage() {
       const path = `${user.id}/${crypto.randomUUID()}-${posterFile.name}`;
       const { error: upErr } = await supabase.storage.from("posters").upload(path, posterFile);
       if (upErr) {
-        setError(upErr.message);
+        setError(translateRuntimeError(upErr.message, t));
         setSaving(null);
         return;
       }
@@ -477,7 +478,7 @@ export default function UploadPage() {
     setSaving(null);
 
     if (epErr) {
-      setError(epErr.message);
+      setError(translateRuntimeError(epErr.message, t));
       return;
     }
 

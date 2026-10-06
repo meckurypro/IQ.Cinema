@@ -58,7 +58,7 @@ export default function NotificationsPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/rewards" aria-label="Back" className="text-text">
+        <Link href="/rewards" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-display text-2xl font-semibold text-text">{t("notifications.title")}</h1>
@@ -90,7 +90,7 @@ export default function NotificationsPage() {
               </button>
               <button
                 type="button"
-                aria-label="Delete notification"
+                aria-label={t("notifications.delete")}
                 onClick={() => remove(n.id)}
                 className="mt-0.5 text-muted"
               >

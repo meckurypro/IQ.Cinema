@@ -11,6 +11,7 @@ import type { OfflineEpisode } from "@/lib/offline/db";
 import { SelectDot } from "@/components/library/SelectDot";
 import { ProgressRing } from "./ProgressRing";
 import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 function fraction(ep: OfflineEpisode) {
   return ep.totalBytes > 0 ? ep.receivedBytes / ep.totalBytes : -1;
@@ -34,7 +35,7 @@ function statusLine(ep: OfflineEpisode, t: ReturnType<typeof useI18n>["t"]) {
           ? t("downloads.pausedPct", { pct })
           : t("downloads.paused");
     case "error":
-      return ep.error || t("watch.downloadFailed");
+      return ep.error ? translateRuntimeError(ep.error, t) : t("watch.downloadFailed");
   }
 }
 

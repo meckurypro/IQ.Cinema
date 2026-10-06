@@ -485,7 +485,7 @@ export function EpisodeFeed({
   // offline viewing — it never triggers a browser file download.
   async function handleDownload() {
     const ep = episodes?.find((e) => e.id === activeId);
-    if (!ep?.video_url || !titleData) throw new Error("No video");
+    if (!ep?.video_url || !titleData) throw new Error(t("watch.noVideo"));
     await offline.download(
       {
         episodeId: ep.id,
@@ -607,10 +607,10 @@ export function EpisodeFeed({
                       </div>
                       <div>
                         <p className="font-display text-lg font-semibold text-white">
-                          Episode {ep.episode_number} is locked
+                          {t("watch.episodeLocked", { n: ep.episode_number })}
                         </p>
                         <p className="mt-1 text-sm text-white/60">
-                          Unlock with coins, or subscribe for unlimited access.
+                          {t("watch.unlockOrSubscribe")}
                         </p>
                       </div>
                       {isActive && error && <p className="text-sm text-crimson">{error}</p>}

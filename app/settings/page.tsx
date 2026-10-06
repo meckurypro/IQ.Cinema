@@ -64,7 +64,7 @@ export default function SettingsPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/profile" aria-label="Back" className="text-text">
+        <Link href="/profile" aria-label={t("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-display text-2xl font-semibold text-text">{t("settings.title")}</h1>

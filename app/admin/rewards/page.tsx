@@ -11,6 +11,8 @@ import { ArrowLeft } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 import { Button } from "@/components/ui/Button";
 
 const supabase = createClient();
@@ -71,6 +73,7 @@ type PointsItem = {
 };
 
 export default function AdminRewardsPage() {
+  const { t: tr, lang } = useI18n();
   const { user, profile, loading } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<SubTab>("tasks");
@@ -116,21 +119,21 @@ export default function AdminRewardsPage() {
   if (loading || !user || !profile?.is_admin) return null;
 
   const TABS: { key: SubTab; label: string }[] = [
-    { key: "tasks", label: "Tasks" },
-    { key: "checkin", label: "Check-in" },
-    { key: "ads", label: "House ads" },
-    { key: "offers", label: "Daily offers" },
-    { key: "coupons", label: "Coupons" },
-    { key: "points", label: "Points items" },
+    { key: "tasks", label: tr("admin.rw.tab.tasks") },
+    { key: "checkin", label: tr("admin.rw.tab.checkin") },
+    { key: "ads", label: tr("admin.rw.tab.ads") },
+    { key: "offers", label: tr("admin.rw.tab.offers") },
+    { key: "coupons", label: tr("admin.rw.tab.coupons") },
+    { key: "points", label: tr("admin.rw.tab.points") },
   ];
 
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/admin" aria-label="Back" className="text-text">
+        <Link href="/admin" aria-label={tr("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Rewards & Store</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{tr("admin.rw.title")}</h1>
       </div>
 
       <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto border-b border-border">
@@ -179,6 +182,7 @@ function TasksTab({
   onChange: (t: RewardTaskRow[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   async function save(t: RewardTaskRow) {
     const { error } = await supabase
       .from("reward_tasks")
@@ -192,7 +196,7 @@ function TasksTab({
         is_active: t.is_active,
       })
       .eq("key", t.key);
-    setMessage(error ? error.message : `Saved "${t.title}".`);
+    setMessage(error ? error.message : tr("admin.rw.savedName", { name: t.title }));
   }
 
   function patch(key: string, partial: Partial<RewardTaskRow>) {
@@ -225,7 +229,7 @@ function TasksTab({
             </button>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            <Field label="Reward coins">
+            <Field label={tr("admin.rewardCoins")}>
               <input
                 type="number"
                 value={t.reward_coins}
@@ -233,7 +237,7 @@ function TasksTab({
                 className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
               />
             </Field>
-            <Field label="Daily cap">
+            <Field label={tr("admin.rw.dailyCap")}>
               <input
                 type="number"
                 value={t.daily_cap ?? ""}
@@ -243,7 +247,7 @@ function TasksTab({
                 className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
               />
             </Field>
-            <Field label="Threshold (s)">
+            <Field label={tr("admin.rw.threshold")}>
               <input
                 type="number"
                 value={t.threshold_seconds ?? ""}
@@ -255,7 +259,7 @@ function TasksTab({
             </Field>
           </div>
           {t.kind === "social" && (
-            <Field label="Link URL" className="mt-2">
+            <Field label={tr("admin.rw.linkUrl")} className="mt-2">
               <input
                 value={t.action_url ?? ""}
                 onChange={(e) => patch(t.key, { action_url: e.target.value })}
@@ -265,7 +269,7 @@ function TasksTab({
             </Field>
           )}
           <Button size="sm" variant="secondary" className="mt-2.5" onClick={() => save(t)}>
-            Save
+            {tr("admin.rw.save")}
           </Button>
         </div>
       ))}
@@ -282,16 +286,17 @@ function CheckinTab({
   onChange: (r: CheckinRow[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   async function saveAll() {
     const { error } = await supabase.from("checkin_rewards").upsert(rows);
-    setMessage(error ? error.message : "Check-in schedule saved.");
+    setMessage(error ? error.message : tr("admin.rw.checkinSaved"));
   }
 
   return (
     <div className="mt-4 space-y-2">
       {rows.map((r) => (
         <div key={r.day_index} className="flex items-center gap-3 rounded-md border border-border bg-surface p-3">
-          <span className="w-14 text-[13px] font-medium text-text">Day {r.day_index}</span>
+          <span className="w-14 text-[13px] font-medium text-text">{tr("rewards.dayN", { n: r.day_index })}</span>
           <input
             type="number"
             value={r.coins}
@@ -302,11 +307,11 @@ function CheckinTab({
             }
             className="h-9 w-24 rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
-          <span className="text-[12px] text-muted">coins</span>
+          <span className="text-[12px] text-muted">{tr("admin.rw.coinsUnit")}</span>
         </div>
       ))}
       <Button size="sm" className="mt-2" onClick={saveAll}>
-        Save schedule
+        {tr("admin.rw.saveSchedule")}
       </Button>
     </div>
   );
@@ -321,6 +326,7 @@ function AdsTab({
   onChange: (a: HouseAd[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   const [form, setForm] = useState({ title: "", image_url: "", video_url: "", cta_label: "", cta_url: "", duration_seconds: 15 });
 
   async function add() {
@@ -339,42 +345,42 @@ function AdsTab({
   return (
     <div className="mt-4 space-y-4">
       <div className="rounded-md border border-border bg-surface p-3.5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">New house ad</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{tr("admin.rw.newAd")}</p>
         <div className="mt-2 space-y-2">
           <input
-            placeholder="Title"
+            placeholder={tr("admin.rw.adTitle")}
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
           <input
-            placeholder="Image URL"
+            placeholder={tr("admin.rw.imageUrl")}
             value={form.image_url}
             onChange={(e) => setForm({ ...form, image_url: e.target.value })}
             className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
           <input
-            placeholder="Video URL (optional)"
+            placeholder={tr("admin.rw.videoUrl")}
             value={form.video_url}
             onChange={(e) => setForm({ ...form, video_url: e.target.value })}
             className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
           <div className="flex gap-2">
             <input
-              placeholder="CTA label"
+              placeholder={tr("admin.rw.ctaLabel")}
               value={form.cta_label}
               onChange={(e) => setForm({ ...form, cta_label: e.target.value })}
               className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
             />
             <input
-              placeholder="CTA URL"
+              placeholder={tr("admin.rw.ctaUrl")}
               value={form.cta_url}
               onChange={(e) => setForm({ ...form, cta_url: e.target.value })}
               className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[12px] text-muted">Duration (s)</label>
+            <label className="text-[12px] text-muted">{tr("admin.rw.duration")}</label>
             <input
               type="number"
               min={5}
@@ -385,7 +391,7 @@ function AdsTab({
             />
           </div>
           <Button size="sm" onClick={add}>
-            Add ad
+            {tr("admin.rw.addAd")}
           </Button>
         </div>
       </div>
@@ -424,6 +430,7 @@ function OffersTab({
   onChange: (o: DailyOfferRow[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ id: string; title: string }[]>([]);
   const [selected, setSelected] = useState<{ id: string; title: string } | null>(null);
@@ -462,10 +469,10 @@ function OffersTab({
   return (
     <div className="mt-4 space-y-4">
       <div className="rounded-md border border-border bg-surface p-3.5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">New daily offer</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{tr("admin.rw.newOffer")}</p>
         <div className="relative mt-2">
           <input
-            placeholder="Search title…"
+            placeholder={tr("admin.rw.searchTitle")}
             value={selected ? selected.title : query}
             onChange={(e) => {
               setSelected(null);
@@ -492,7 +499,7 @@ function OffersTab({
           )}
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <label className="text-[12px] text-muted">% off</label>
+          <label className="text-[12px] text-muted">{tr("admin.rw.percentOff")}</label>
           <input
             type="number"
             min={1}
@@ -501,7 +508,7 @@ function OffersTab({
             onChange={(e) => setDiscount(Number(e.target.value))}
             className="h-9 w-20 rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
-          <label className="ml-2 text-[12px] text-muted">Ends</label>
+          <label className="ml-2 text-[12px] text-muted">{tr("admin.rw.ends")}</label>
           <input
             type="datetime-local"
             value={endsAt}
@@ -510,7 +517,7 @@ function OffersTab({
           />
         </div>
         <Button size="sm" className="mt-2.5" disabled={!selected} onClick={add}>
-          Add offer
+          {tr("admin.rw.addOffer")}
         </Button>
       </div>
 
@@ -519,7 +526,7 @@ function OffersTab({
           <div>
             <p className="text-[13px] text-text">{o.titles?.title ?? o.title_id}</p>
             <p className="text-[11.5px] text-muted">
-              {o.discount_percent}% off · ends {new Date(o.ends_at).toLocaleString()}
+              {tr("admin.rw.offerLine", { pct: o.discount_percent, date: new Date(o.ends_at).toLocaleString(lang) })}
             </p>
           </div>
           <button
@@ -553,6 +560,7 @@ function CouponsTab({
   onChange: (c: CouponTemplate[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   const [form, setForm] = useState({ name: "", discount_percent: 20, valid_days: 7 });
   const [grantUsername, setGrantUsername] = useState("");
   const [grantTemplateId, setGrantTemplateId] = useState<string | null>(null);
@@ -579,30 +587,30 @@ function CouponsTab({
         .select("id")
         .eq("username", grantUsername.trim())
         .maybeSingle();
-      if (!p) return setMessage("No user with that username.");
+      if (!p) return setMessage(tr("admin.rw.noUser"));
       userId = p.id;
     }
     const { data, error } = await supabase.rpc("admin_grant_coupon", {
       p_template_id: templateId,
       p_user_id: userId,
     });
-    setMessage(error ? error.message : data?.ok ? `Granted to ${data.granted} user(s).` : data?.error);
+    setMessage(error ? error.message : data?.ok ? tr("admin.rw.grantedTo", { n: data.granted }) : data?.error);
   }
 
   return (
     <div className="mt-4 space-y-4">
       <div className="rounded-md border border-border bg-surface p-3.5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">New coupon template</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{tr("admin.rw.newCoupon")}</p>
         <div className="mt-2 flex gap-2">
           <input
-            placeholder="Name"
+            placeholder={tr("admin.rw.name")}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <label className="text-[12px] text-muted">% off</label>
+          <label className="text-[12px] text-muted">{tr("admin.rw.percentOff")}</label>
           <input
             type="number"
             min={1}
@@ -611,7 +619,7 @@ function CouponsTab({
             onChange={(e) => setForm({ ...form, discount_percent: Number(e.target.value) })}
             className="h-9 w-20 rounded-md border border-border bg-bg px-2 text-[13px] text-text"
           />
-          <label className="ml-2 text-[12px] text-muted">Valid days</label>
+          <label className="ml-2 text-[12px] text-muted">{tr("admin.rw.validDays")}</label>
           <input
             type="number"
             min={1}
@@ -621,14 +629,14 @@ function CouponsTab({
           />
         </div>
         <Button size="sm" className="mt-2.5" onClick={add}>
-          Add template
+          {tr("admin.rw.addTemplate")}
         </Button>
       </div>
 
       <div className="rounded-md border border-border bg-surface p-3.5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Grant to a user</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{tr("admin.rw.grantToUser")}</p>
         <input
-          placeholder="Username (leave blank + Grant to all)"
+          placeholder={tr("admin.rw.usernameBlank")}
           value={grantUsername}
           onChange={(e) => setGrantUsername(e.target.value)}
           className="mt-2 h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
@@ -638,7 +646,7 @@ function CouponsTab({
           onChange={(e) => setGrantTemplateId(e.target.value || null)}
           className="mt-2 h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
         >
-          <option value="">Select a template…</option>
+          <option value="">{tr("admin.rw.selectTemplate")}</option>
           {coupons.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name} ({c.discount_percent}%)
@@ -652,7 +660,7 @@ function CouponsTab({
             disabled={!grantTemplateId || !grantUsername.trim()}
             onClick={() => grantTemplateId && grant(grantTemplateId, false)}
           >
-            Grant to user
+            {tr("admin.rw.grantUser")}
           </Button>
           <Button
             size="sm"
@@ -660,7 +668,7 @@ function CouponsTab({
             disabled={!grantTemplateId}
             onClick={() => grantTemplateId && grant(grantTemplateId, true)}
           >
-            Grant to everyone
+            {tr("admin.rw.grantAll")}
           </Button>
         </div>
       </div>
@@ -701,6 +709,7 @@ function PointsItemsTab({
   onChange: (i: PointsItem[]) => void;
   setMessage: (m: string | null) => void;
 }) {
+  const { t: tr, lang } = useI18n();
   const [form, setForm] = useState<{
     kind: PointsItem["kind"];
     name: string;
@@ -732,23 +741,23 @@ function PointsItemsTab({
   return (
     <div className="mt-4 space-y-4">
       <div className="rounded-md border border-border bg-surface p-3.5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">New redemption item</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{tr("admin.rw.newItem")}</p>
         <select
           value={form.kind}
           onChange={(e) => setForm({ ...form, kind: e.target.value as PointsItem["kind"] })}
           className="mt-2 h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
         >
-          <option value="reward_coins">Reward coins</option>
-          <option value="membership_days">Membership days</option>
+          <option value="reward_coins">{tr("admin.rewardCoins")}</option>
+          <option value="membership_days">{tr("admin.rw.membershipDays")}</option>
         </select>
         <input
-          placeholder="Name"
+          placeholder={tr("admin.rw.name")}
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           className="mt-2 h-9 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text"
         />
         <div className="mt-2 flex items-center gap-2">
-          <label className="text-[12px] text-muted">Cost (points)</label>
+          <label className="text-[12px] text-muted">{tr("admin.rw.costPoints")}</label>
           <input
             type="number"
             value={form.cost_points}
@@ -757,7 +766,7 @@ function PointsItemsTab({
           />
           {form.kind === "membership_days" ? (
             <>
-              <label className="ml-2 text-[12px] text-muted">Days</label>
+              <label className="ml-2 text-[12px] text-muted">{tr("admin.rw.days")}</label>
               <input
                 type="number"
                 value={form.membership_days}
@@ -767,7 +776,7 @@ function PointsItemsTab({
             </>
           ) : (
             <>
-              <label className="ml-2 text-[12px] text-muted">Coins</label>
+              <label className="ml-2 text-[12px] text-muted">{tr("admin.coins")}</label>
               <input
                 type="number"
                 value={form.reward_coins}
@@ -778,14 +787,14 @@ function PointsItemsTab({
           )}
         </div>
         <Button size="sm" className="mt-2.5" onClick={add}>
-          Add item
+          {tr("admin.rw.addItem")}
         </Button>
       </div>
 
       {items.map((i) => (
         <div key={i.id} className="flex items-center justify-between rounded-md border border-border bg-surface p-3">
           <span className="text-[13px] text-text">
-            {i.name} · {i.cost_points} pts
+            {i.name} · {tr("admin.rw.pts", { n: i.cost_points })}
           </span>
           <button
             role="switch"

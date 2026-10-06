@@ -556,10 +556,10 @@ export function ForYouFeed() {
                       {tab === "trending" && item.feed_rank ? (
                         <span className="flex w-fit items-center gap-1 rounded-full bg-gradient-to-r from-pink to-crimson px-2.5 py-1 text-[11px] font-bold text-white">
                           <Flame size={12} className="fill-white" />
-                          #{item.feed_rank} Trending
+                          {t("foryou.trendingRank", { n: item.feed_rank })}
                           {(item.recent_views ?? 0) > 0 && (
                             <span className="font-medium text-white/85">
-                              · {formatCount(item.recent_views ?? 0)} this week
+                              · {t("foryou.thisWeek", { n: formatCount(item.recent_views ?? 0) })}
                             </span>
                           )}
                         </span>

@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
 
@@ -88,6 +90,7 @@ function tierOf(u: Pick<SearchedProfile, "role" | "creator_status">): ContentTie
 }
 
 export default function AdminPage() {
+  const { t: tr, lang } = useI18n();
   const { user, profile, loading } = useAuth();
   const router = useRouter();
   const supabase = createClient();
@@ -150,7 +153,7 @@ export default function AdminPage() {
     setTitleActionId(titleId);
     const note =
       decision === "declined"
-        ? window.prompt("Reason for declining (shown to the creator):") ?? undefined
+        ? window.prompt(tr("admin.declineReason")) ?? undefined
         : undefined;
     if (decision === "declined" && note === undefined) {
       setTitleActionId(null);
@@ -264,7 +267,7 @@ export default function AdminPage() {
       p_note: "admin panel grant",
     });
     setUserActionId(null);
-    setGrantMessage(!error && data?.ok ? "Granted." : data?.error ?? "Failed to grant.");
+    setGrantMessage(!error && data?.ok ? tr("admin.granted") : data?.error ?? tr("admin.grantFailed"));
     if (!error && data?.ok) setGrantAmount("");
   }
 
@@ -327,7 +330,7 @@ export default function AdminPage() {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) {
-      setWithdrawalError("Not signed in.");
+      setWithdrawalError(tr("err.notSignedIn"));
       setWithdrawalActionId(null);
       return;
     }
@@ -341,10 +344,10 @@ export default function AdminPage() {
         }
       );
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "Transfer failed");
+      if (!json.ok) throw new Error(json.error || tr("admin.transferFailed"));
       setWithdrawals((prev) => prev.filter((x) => x.id !== w.id));
     } catch (e) {
-      setWithdrawalError((e as Error).message);
+      setWithdrawalError(translateRuntimeError((e as Error).message, tr));
     }
     setWithdrawalActionId(null);
   }
@@ -356,7 +359,7 @@ export default function AdminPage() {
       p_withdrawal_id: w.id,
     });
     if (error || !data?.ok) {
-      setWithdrawalError(error?.message || data?.error || "Could not decline withdrawal");
+      setWithdrawalError(translateRuntimeError(error?.message, tr) || data?.error || tr("admin.declineFailed"));
       setWithdrawalActionId(null);
       return;
     }
@@ -381,19 +384,19 @@ export default function AdminPage() {
   const ignoredReviewTitles = reviewTitles.filter((t) => t.review_ignored_at);
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "projects", label: "Projects", count: pendingReviewTitles.length },
-    { key: "applications", label: "Creators", count: applications.length },
-    { key: "partners", label: "Partner apps", count: partnerApps.length },
-    { key: "withdrawals", label: "Withdrawals", count: withdrawals.length },
-    { key: "reports", label: "Reports", count: reports.length },
-    { key: "links", label: "Features" },
-    { key: "users", label: "Users" },
-    { key: "settings", label: "Settings" },
+    { key: "projects", label: tr("admin.tab.projects"), count: pendingReviewTitles.length },
+    { key: "applications", label: tr("admin.tab.creators"), count: applications.length },
+    { key: "partners", label: tr("admin.tab.partners"), count: partnerApps.length },
+    { key: "withdrawals", label: tr("admin.tab.withdrawals"), count: withdrawals.length },
+    { key: "reports", label: tr("admin.tab.reports"), count: reports.length },
+    { key: "links", label: tr("admin.tab.features") },
+    { key: "users", label: tr("admin.tab.users") },
+    { key: "settings", label: tr("admin.tab.settings") },
   ];
 
   return (
     <div className="fade-in px-4 pt-5 pb-10">
-      <h1 className="font-display text-2xl font-semibold text-text">Admin</h1>
+      <h1 className="font-display text-2xl font-semibold text-text">{tr("admin.title")}</h1>
 
       <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto border-b border-border">
         {tabs.map((t) => (
@@ -412,13 +415,13 @@ export default function AdminPage() {
           href="/admin/rewards"
           className="shrink-0 border-b-2 border-transparent pb-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Rewards & Store ↗
+          {tr("admin.rewardsStore")}
         </Link>
         <Link
           href="/admin/promos"
           className="shrink-0 border-b-2 border-transparent pb-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Promotions ↗
+          {tr("admin.promotions")}
         </Link>
       </div>
 
@@ -426,8 +429,7 @@ export default function AdminPage() {
         <div className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-[12px] text-muted">
-              Approve makes the project (and its finalized episodes) live. Decline sends it back to
-              the creator with a note. Ignore leaves it in review for now — revisit anytime.
+              {tr("admin.projectsHelp")}
             </p>
           </div>
           <ul className="space-y-3">
@@ -435,8 +437,8 @@ export default function AdminPage() {
               <li key={t.id} className="rounded-md border border-border bg-surface p-3.5">
                 <p className="text-[14px] font-medium text-text">{t.title}</p>
                 <p className="mt-0.5 text-[12px] text-muted">
-                  {t.genre ?? "No genre"} · {t.content_type.replace(/_/g, " ")}
-                  {t.profiles?.username ? ` · by @${t.profiles.username}` : ""}
+                  {t.genre ?? tr("admin.noGenre")} · {t.content_type.replace(/_/g, " ")}
+                  {t.profiles?.username ? ` · ${tr("admin.byUser", { u: t.profiles.username })}` : ""}
                 </p>
                 {t.synopsis && <p className="mt-1.5 text-[13px] text-muted">{t.synopsis}</p>}
                 <div className="mt-3 flex gap-2">
@@ -445,7 +447,7 @@ export default function AdminPage() {
                     disabled={titleActionId === t.id}
                     onClick={() => reviewTitle(t.id, "approved")}
                   >
-                    Approve
+                    {tr("admin.approve")}
                   </Button>
                   <Button
                     size="sm"
@@ -453,7 +455,7 @@ export default function AdminPage() {
                     disabled={titleActionId === t.id}
                     onClick={() => reviewTitle(t.id, "declined")}
                   >
-                    Decline
+                    {tr("admin.decline")}
                   </Button>
                   <Button
                     size="sm"
@@ -461,14 +463,14 @@ export default function AdminPage() {
                     disabled={titleActionId === t.id}
                     onClick={() => reviewTitle(t.id, "ignored")}
                   >
-                    Ignore
+                    {tr("admin.ignore")}
                   </Button>
                 </div>
               </li>
             ))}
             {!(showIgnored ? ignoredReviewTitles : pendingReviewTitles).length && (
               <p className="mt-6 text-center text-sm text-muted">
-                {showIgnored ? "Nothing ignored." : "No projects awaiting review."}
+                {showIgnored ? tr("admin.nothingIgnored") : tr("admin.noProjects")}
               </p>
             )}
           </ul>
@@ -479,8 +481,8 @@ export default function AdminPage() {
               className="text-[12px] font-medium text-muted underline underline-offset-2"
             >
               {showIgnored
-                ? "Back to pending review"
-                : `Show ignored (${ignoredReviewTitles.length})`}
+                ? tr("admin.backToPending")
+                : tr("admin.showIgnored", { n: ignoredReviewTitles.length })}
             </button>
           )}
         </div>
@@ -493,31 +495,31 @@ export default function AdminPage() {
               <p className="text-[14px] font-medium text-text">@{a.profiles?.username}</p>
               <p className="mt-1 text-[13px] text-muted">{a.bio}</p>
               {a.primary_genre && (
-                <p className="mt-1 text-[12px] text-muted">Genre: {a.primary_genre}</p>
+                <p className="mt-1 text-[12px] text-muted">{tr("admin.genreLabel", { g: a.primary_genre })}</p>
               )}
               <div className="mt-3 flex gap-2">
                 <Button size="sm" onClick={() => reviewApplication(a.id, a.user_id, "approved")}>
-                  Approve
+                  {tr("admin.approve")}
                 </Button>
                 <Button
                   size="sm"
                   variant="danger"
                   onClick={() => reviewApplication(a.id, a.user_id, "declined")}
                 >
-                  Decline
+                  {tr("admin.decline")}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => reviewApplication(a.id, a.user_id, "ignored")}
                 >
-                  Ignore
+                  {tr("admin.ignore")}
                 </Button>
               </div>
             </li>
           ))}
           {!applications.length && (
-            <p className="mt-6 text-center text-sm text-muted">No pending applications.</p>
+            <p className="mt-6 text-center text-sm text-muted">{tr("admin.noApplications")}</p>
           )}
         </ul>
       )}
@@ -532,16 +534,16 @@ export default function AdminPage() {
               </pre>
               <div className="mt-3 flex gap-2">
                 <Button size="sm" onClick={() => reviewPartnerApp(a.id, a.user_id, true)}>
-                  Approve partner
+                  {tr("admin.approvePartner")}
                 </Button>
                 <Button size="sm" variant="danger" onClick={() => reviewPartnerApp(a.id, a.user_id, false)}>
-                  Decline
+                  {tr("admin.decline")}
                 </Button>
               </div>
             </li>
           ))}
           {!partnerApps.length && (
-            <p className="mt-6 text-center text-sm text-muted">No pending partner applications.</p>
+            <p className="mt-6 text-center text-sm text-muted">{tr("admin.noPartnerApps")}</p>
           )}
         </ul>
       )}
@@ -549,8 +551,7 @@ export default function AdminPage() {
       {tab === "withdrawals" && (
         <div className="mt-4 space-y-3">
           <p className="text-[12px] text-muted">
-            Approve fires a real Paystack transfer to the creator's bank account. Decline returns
-            the held amount to their balance.
+            {tr("admin.withdrawalsHelp")}
           </p>
           {withdrawalError && (
             <p className="rounded-md bg-crimson-soft px-3 py-2 text-[13px] text-crimson">
@@ -576,7 +577,7 @@ export default function AdminPage() {
                   {w.bank_account_name} · {w.bank_account_number} · {w.bank_code}
                 </p>
                 <p className="mt-1 text-[11px] text-muted">
-                  Requested {new Date(w.requested_at).toLocaleString()}
+                  {tr("admin.requested", { date: new Date(w.requested_at).toLocaleString(lang) })}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <Button
@@ -584,7 +585,7 @@ export default function AdminPage() {
                     disabled={withdrawalActionId === w.id}
                     onClick={() => approveWithdrawal(w)}
                   >
-                    {withdrawalActionId === w.id ? "Processing…" : "Approve & pay out"}
+                    {withdrawalActionId === w.id ? tr("admin.processing") : tr("admin.approvePay")}
                   </Button>
                   <Button
                     size="sm"
@@ -592,14 +593,14 @@ export default function AdminPage() {
                     disabled={withdrawalActionId === w.id}
                     onClick={() => declineWithdrawal(w)}
                   >
-                    Decline
+                    {tr("admin.decline")}
                   </Button>
                 </div>
               </li>
             ))}
           </ul>
           {!withdrawals.length && (
-            <p className="mt-6 text-center text-sm text-muted">No pending withdrawal requests.</p>
+            <p className="mt-6 text-center text-sm text-muted">{tr("admin.noWithdrawals")}</p>
           )}
         </div>
       )}
@@ -608,17 +609,16 @@ export default function AdminPage() {
         <ul className="mt-4 space-y-3">
           {reports.map((r) => (
             <li key={r.id} className="rounded-md border border-border bg-surface p-3.5">
-              <p className="text-[14px] font-medium text-text">{r.titles?.title ?? "Untitled"}</p>
+              <p className="text-[14px] font-medium text-text">{r.titles?.title ?? tr("admin.untitled")}</p>
               <p className="mt-1 text-[13px] text-muted">{r.reason}</p>
               {r.details && <p className="mt-1 text-[12px] text-muted">{r.details}</p>}
               <p className="mt-2 text-[11px] text-muted">
-                Use the strike flow from a full moderation view once wired up — this MVP view is
-                read-only for reports.
+                {tr("admin.reportsHelp")}
               </p>
             </li>
           ))}
           {!reports.length && (
-            <p className="mt-6 text-center text-sm text-muted">No pending reports.</p>
+            <p className="mt-6 text-center text-sm text-muted">{tr("admin.noReports")}</p>
           )}
         </ul>
       )}
@@ -626,7 +626,7 @@ export default function AdminPage() {
       {tab === "links" && (
         <div className="mt-4 space-y-3">
           <p className="text-[12px] text-muted">
-            Turn a feature off to hide it for every user (profile links and Settings sections) — no code changes needed.
+            {tr("admin.featuresHelp")}
           </p>
           <ul className="space-y-3">
             {flags.map((f) => (
@@ -661,7 +661,7 @@ export default function AdminPage() {
               </li>
             ))}
             {!flags.length && (
-              <p className="mt-6 text-center text-sm text-muted">No features configured yet.</p>
+              <p className="mt-6 text-center text-sm text-muted">{tr("admin.noFeatures")}</p>
             )}
           </ul>
         </div>
@@ -672,12 +672,12 @@ export default function AdminPage() {
           <input
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
-            placeholder="Search by username, name, or email"
+            placeholder={tr("admin.searchUsers")}
             className="h-11 w-full rounded-md border border-border bg-surface px-3 text-[14px] text-text"
             autoComplete="off"
           />
 
-          {userSearchLoading && <p className="text-[13px] text-muted">Searching…</p>}
+          {userSearchLoading && <p className="text-[13px] text-muted">{tr("admin.searching")}</p>}
 
           <ul className="space-y-3">
             {userResults.map((u) => (
@@ -689,8 +689,7 @@ export default function AdminPage() {
                 <p className="mt-1 text-[12px] text-muted">{u.email}</p>
 
                 <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Content tier — viewer applies to become creator, creator applies to become
-                  partner
+                  {tr("admin.tierHelp")}
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {TIER_OPTIONS.map((opt) => {
@@ -710,23 +709,23 @@ export default function AdminPage() {
                             : "border-border text-muted hover:text-text"
                         )}
                       >
-                        {opt.label}
+                        {tr(opt.key === "viewer" ? "admin.tier.viewer" : opt.key === "creator" ? "admin.tier.creator" : "admin.tier.partner")}
                       </button>
                     );
                   })}
                 </div>
 
                 <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Staff &amp; admin — independent of content tier and of each other
+                  {tr("admin.staffAdminHelp")}
                 </p>
                 <div className="mt-1.5 space-y-2">
                   <div className="flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
-                    <p className="text-[13px] font-medium text-text">Staff</p>
+                    <p className="text-[13px] font-medium text-text">{tr("admin.staff")}</p>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={u.is_staff}
-                      aria-label="Staff"
+                      aria-label={tr("admin.staff")}
                       disabled={userActionId === u.id}
                       onClick={() => setStaff(u, !u.is_staff)}
                       className={clsx(
@@ -743,12 +742,12 @@ export default function AdminPage() {
                     </button>
                   </div>
                   <div className="flex items-center justify-between rounded-md border border-border bg-bg/40 px-3 py-2.5">
-                    <p className="text-[13px] font-medium text-text">Admin</p>
+                    <p className="text-[13px] font-medium text-text">{tr("admin.admin")}</p>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={u.is_admin}
-                      aria-label="Admin"
+                      aria-label={tr("admin.admin")}
                       disabled={userActionId === u.id}
                       onClick={() => setAdmin(u, !u.is_admin)}
                       className={clsx(
@@ -767,7 +766,7 @@ export default function AdminPage() {
                 </div>
 
                 <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Grant currency
+                  {tr("admin.grantCurrency")}
                 </p>
                 <div className="mt-1.5 flex gap-1.5">
                   <select
@@ -775,14 +774,14 @@ export default function AdminPage() {
                     onChange={(e) => setGrantCurrency(e.target.value as typeof grantCurrency)}
                     className="h-10 rounded-md border border-border bg-surface px-2 text-[13px] text-text"
                   >
-                    <option value="coins">Coins</option>
-                    <option value="reward_coins">Reward coins</option>
-                    <option value="points">Points</option>
+                    <option value="coins">{tr("admin.coins")}</option>
+                    <option value="reward_coins">{tr("admin.rewardCoins")}</option>
+                    <option value="points">{tr("admin.points")}</option>
                   </select>
                   <input
                     type="number"
                     min={1}
-                    placeholder="Amount"
+                    placeholder={tr("admin.amount")}
                     value={grantAmount}
                     onChange={(e) => setGrantAmount(e.target.value)}
                     className="h-10 w-24 rounded-md border border-border bg-surface px-2 text-[13px] text-text"
@@ -793,14 +792,14 @@ export default function AdminPage() {
                     disabled={userActionId === u.id || !grantAmount}
                     onClick={() => grantCurrencyTo(u)}
                   >
-                    Grant
+                    {tr("admin.grant")}
                   </Button>
                 </div>
                 {grantMessage && <p className="mt-1 text-[11.5px] text-muted">{grantMessage}</p>}
               </li>
             ))}
             {!userResults.length && !userSearchLoading && userQuery.trim() && (
-              <p className="mt-6 text-center text-sm text-muted">No matching users.</p>
+              <p className="mt-6 text-center text-sm text-muted">{tr("admin.noUsers")}</p>
             )}
           </ul>
         </div>
@@ -809,20 +808,20 @@ export default function AdminPage() {
       {tab === "settings" && settings && (
         <form onSubmit={saveSettings} className="mt-4 space-y-3">
           {[
-            ["coin_to_naira", "Coin → Naira rate"],
-            ["default_episode_unlock_coins", "Default unlock cost (coins)"],
-            ["default_free_episodes", "Default free episodes"],
-            ["creator_revenue_share", "Creator revenue share (0–1)"],
-            ["min_payout_threshold_naira", "Minimum payout (₦)"],
-            ["partner_min_unique_views", "Partner: min unique views"],
-            ["partner_min_watch_hours", "Partner: min watch hours"],
-            ["partner_min_episodes", "Partner: min episodes"],
-            ["strikes_before_suspension", "Strikes before suspension"],
-            ["strike_suspension_months", "Suspension length (months)"],
-            ["strike_expiry_months", "Strike expiry (months)"],
-            ["reward_coin_creator_share", "Creator share of reward-coin spend (0–1)"],
-            ["points_box_min", "Daily points box — min"],
-            ["points_box_max", "Daily points box — max"],
+            ["coin_to_naira", tr("admin.set.coinToNaira")],
+            ["default_episode_unlock_coins", tr("admin.set.unlockCost")],
+            ["default_free_episodes", tr("admin.set.freeEpisodes")],
+            ["creator_revenue_share", tr("admin.set.revenueShare")],
+            ["min_payout_threshold_naira", tr("admin.set.minPayout")],
+            ["partner_min_unique_views", tr("admin.set.partnerViews")],
+            ["partner_min_watch_hours", tr("admin.set.partnerHours")],
+            ["partner_min_episodes", tr("admin.set.partnerEpisodes")],
+            ["strikes_before_suspension", tr("admin.set.strikes")],
+            ["strike_suspension_months", tr("admin.set.suspensionMonths")],
+            ["strike_expiry_months", tr("admin.set.strikeExpiry")],
+            ["reward_coin_creator_share", tr("admin.set.rewardShare")],
+            ["points_box_min", tr("admin.set.boxMin")],
+            ["points_box_max", tr("admin.set.boxMax")],
           ].map(([key, label]) => (
             <div key={key}>
               <label className="text-[12px] text-muted">{label}</label>
@@ -841,7 +840,7 @@ export default function AdminPage() {
               checked={!!settings.ads_enabled}
               onChange={(e) => setSettings({ ...settings, ads_enabled: e.target.checked })}
             />
-            <span className="text-[13px] text-text">Ads enabled</span>
+            <span className="text-[13px] text-text">{tr("admin.set.adsEnabled")}</span>
           </label>
           <label className="flex items-center gap-2 pt-1">
             <input
@@ -849,10 +848,10 @@ export default function AdminPage() {
               checked={!!settings.points_box_vip_only}
               onChange={(e) => setSettings({ ...settings, points_box_vip_only: e.target.checked })}
             />
-            <span className="text-[13px] text-text">Daily points box is VIP-only</span>
+            <span className="text-[13px] text-text">{tr("admin.set.boxVip")}</span>
           </label>
           <Button type="submit" className="w-full">
-            Save settings
+            {tr("admin.set.save")}
           </Button>
         </form>
       )}

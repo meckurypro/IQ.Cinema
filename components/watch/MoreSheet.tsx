@@ -9,6 +9,7 @@ import { BottomSheet, markSheetNavigating } from "@/components/shared/BottomShee
 import { ProgressRing } from "@/components/downloads/ProgressRing";
 import type { OfflineEpisode } from "@/lib/offline/db";
 import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 // Every episode is stored as a single rendition today (see video_width /
 // video_height on the row) — there's no ladder of bitrates to switch
@@ -59,7 +60,7 @@ export function MoreSheet({
     try {
       await onDownload();
     } catch (e) {
-      setDownloadError(e instanceof Error && e.message ? e.message : t("watch.downloadStartError"));
+      setDownloadError(e instanceof Error && e.message ? translateRuntimeError(e.message, t) : t("watch.downloadStartError"));
     } finally {
       setStarting(false);
     }
@@ -137,7 +138,7 @@ export function MoreSheet({
                     : t("watch.downloadPaused")}
               </span>
               {status === "error" && downloadState.error && (
-                <span className="ml-[30px] mt-0.5 text-[12px] text-crimson">{downloadState.error}</span>
+                <span className="ml-[30px] mt-0.5 text-[12px] text-crimson">{translateRuntimeError(downloadState.error, t)}</span>
               )}
             </span>
             <button type="button" onClick={onResumeDownload} aria-label={status === "error" ? t("watch.retryDownload") : t("watch.resumeDownload")}>

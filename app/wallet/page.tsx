@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import clsx from "clsx";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 const TIP_KEYS: MessageKey[] = [
   "wallet.tip1",
@@ -60,7 +61,7 @@ export default function WalletPage() {
       const { authorization_url } = await initializePaystackPurchase(type, id);
       redirectToPaystackCheckout(authorization_url);
     } catch (e) {
-      setError((e as Error).message);
+      setError(translateRuntimeError((e as Error).message, t));
       setBuyingId(null);
     }
   }

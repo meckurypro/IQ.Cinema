@@ -156,13 +156,13 @@ export default function LibraryPage() {
               </div>
             )}
 
-            <p className="mt-8 pb-2 text-center text-[15px] text-muted/70">--The End--</p>
+            <p className="mt-8 pb-2 text-center text-[15px] text-muted/70">{t("library.theEnd")}</p>
           </div>
         )}
 
         {error && items !== null && (
           <p className="mt-4 text-center text-[13px] text-crimson">
-            Something went wrong: {error}
+            {t("library.somethingWrong", { error })}
           </p>
         )}
       </div>

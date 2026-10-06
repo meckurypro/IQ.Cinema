@@ -4,6 +4,7 @@
 
 import { Check, Zap } from "lucide-react";
 import clsx from "clsx";
+import { useI18n } from "@/hooks/useI18n";
 
 export function StreakCalendar({
   schedule,
@@ -14,8 +15,9 @@ export function StreakCalendar({
   todayIndex: number;
   checkedInToday: boolean;
 }) {
+  const { t } = useI18n();
   return (
-    <div role="list" aria-label="7-day check-in streak" className="grid grid-cols-7 gap-1.5">
+    <div role="list" aria-label={t("rewards.streakLabel")} className="grid grid-cols-7 gap-1.5">
       {schedule.map((d) => {
         const isToday = d.day_index === todayIndex;
         const isPast = d.day_index < todayIndex || (isToday && checkedInToday);
@@ -32,7 +34,7 @@ export function StreakCalendar({
                 : "bg-surface-raised text-muted"
             )}
           >
-            <span className="text-[10px] font-medium opacity-90">Day{d.day_index}</span>
+            <span className="text-[10px] font-medium opacity-90">{t("rewards.dayN", { n: d.day_index })}</span>
             <span
               className={clsx(
                 "flex h-6 w-6 items-center justify-center rounded-full",

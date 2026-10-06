@@ -14,6 +14,7 @@ import clsx from "clsx";
 import { BottomNav } from "./BottomNav";
 import { SideNav } from "./SideNav";
 import { AppMain } from "./AppMain";
+import { NetworkBanner } from "./NetworkBanner";
 
 // Full-bleed video pages: black stage, the feed draws its own centred column.
 const IMMERSIVE = ["/for-you", "/watch/", "/downloads/play"];
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <NetworkBanner />
       {showSide && <SideNav />}
       <div
         className={clsx(

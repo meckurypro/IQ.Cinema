@@ -44,7 +44,7 @@ export function FolderCard({
             className={clsx("h-full w-full object-cover transition-transform duration-300", !editing && "group-active:scale-95")}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted">No poster</div>
+          <div className="flex h-full items-center justify-center text-xs text-muted">{t("common.poster.none")}</div>
         )}
 
         {folder.activeCount > 0 && (

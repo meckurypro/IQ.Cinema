@@ -41,7 +41,7 @@ export function WhatsAppLinkSheet({
     <BottomSheet open={open} onClose={onClose} title={t("whatsapp.title")}>
       <div className="px-4 pb-4 pt-1">
         <p className="text-[13px] text-muted">
-          Add your WhatsApp number so we can reach you about your account and orders.
+          {t("whatsapp.intro")}
         </p>
         <input
           type="tel"

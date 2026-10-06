@@ -29,6 +29,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { Button } from "@/components/ui/Button";
 import { NotificationBell } from "@/components/shared/NotificationBell";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 type HistoryItem = {
   poster_url: string | null;
@@ -101,11 +102,11 @@ export default function ProfilePage() {
 
     setAvatarError(null);
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setAvatarError("Use a JPG, PNG, or WEBP image.");
+      setAvatarError(t("profile.photoType"));
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setAvatarError("Image must be under 2MB.");
+      setAvatarError(t("profile.photoSize"));
       return;
     }
 
@@ -118,7 +119,7 @@ export default function ProfilePage() {
       .upload(path, file, { upsert: true, cacheControl: "3600" });
 
     if (uploadError) {
-      setAvatarError(uploadError.message);
+      setAvatarError(translateRuntimeError(uploadError.message, t));
       setAvatarUploading(false);
       return;
     }
@@ -194,7 +195,7 @@ export default function ProfilePage() {
               type="button"
               onClick={() => avatarInputRef.current?.click()}
               disabled={avatarUploading}
-              aria-label="Change profile photo"
+              aria-label={t("profile.changePhoto")}
               className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-surface-raised font-display text-lg font-semibold text-text disabled:opacity-70"
             >
               {avatarUrl ? (
@@ -217,7 +218,7 @@ export default function ProfilePage() {
           <div>
             <p className="text-[16px] font-semibold text-text">{profile?.display_name ?? "—"}</p>
             <p className="text-[13px] text-muted">@{profile?.username}</p>
-            {avatarUploading && <p className="mt-0.5 text-[11px] text-muted">Uploading…</p>}
+            {avatarUploading && <p className="mt-0.5 text-[11px] text-muted">{t("profile.uploading")}</p>}
             {avatarError && <p className="mt-0.5 text-[11px] text-crimson">{avatarError}</p>}
           </div>
         </div>

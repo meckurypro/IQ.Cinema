@@ -297,7 +297,7 @@ export function ForYouSearch({
           <>
             {!loading && settledQuery === q && !failed && results.length > 0 && (
               <p className="px-4 pb-1 pt-3 text-[12px] font-semibold uppercase tracking-wide text-white/45">
-                {results.length} {results.length === 1 ? "result" : "results"}
+                {t(results.length === 1 ? "foryou.resultOne" : "foryou.resultMany", { n: results.length })}
               </p>
             )}
             {results.map((item) => (

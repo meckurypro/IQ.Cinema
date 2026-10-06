@@ -14,6 +14,7 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 
 const supabase = createClient();
 
@@ -48,7 +49,7 @@ export default function PointsPage() {
   const refresh = useCallback(async () => {
     const { data, error: rpcError } = await supabase.rpc("get_points_state");
     if (rpcError) {
-      setError(rpcError.message);
+      setError(translateRuntimeError(rpcError.message, t));
       return;
     }
     setState(data as PointsState);

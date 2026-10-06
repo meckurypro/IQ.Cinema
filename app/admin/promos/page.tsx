@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
+import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 import { Button } from "@/components/ui/Button";
 
 const supabase = createClient();
@@ -17,6 +19,7 @@ const supabase = createClient();
 // Sends a promotion to every user who has "Promotions" switched on in Settings.
 // The server (admin_send_promo) enforces admin-only access and the opt-in filter.
 export default function AdminPromosPage() {
+  const { t: tr } = useI18n();
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [title, setTitle] = useState("");
@@ -34,7 +37,7 @@ export default function AdminPromosPage() {
   if (loading || !user || !profile?.is_admin) return null;
 
   async function send() {
-    if (!window.confirm("Send this promotion to everyone who opted in?")) return;
+    if (!window.confirm(tr("admin.pr.confirm"))) return;
     setBusy(true);
     setResult(null);
     setError(null);
@@ -47,14 +50,14 @@ export default function AdminPromosPage() {
     if (rpcError) {
       setError(
         rpcError.message.includes("href_must_be_in_app_path")
-          ? "The link must be an in-app path starting with / (for example /title/my-show)."
+          ? tr("admin.pr.hrefError")
           : rpcError.message.includes("title_required")
-            ? "Add a title."
+            ? tr("admin.pr.addTitle")
             : rpcError.message
       );
       return;
     }
-    setResult(`Sent to ${data as number} user${data === 1 ? "" : "s"}.`);
+    setResult(tr(data === 1 ? "admin.pr.sentOne" : "admin.pr.sentMany", { n: data as number }));
     setTitle("");
     setBody("");
     setHref("");
@@ -65,24 +68,23 @@ export default function AdminPromosPage() {
   return (
     <div className="fade-in px-4 pt-5 pb-10">
       <div className="flex items-center gap-3">
-        <Link href="/admin" aria-label="Back" className="text-text">
+        <Link href="/admin" aria-label={tr("common.back")} className="text-text">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text">Send promotion</h1>
+        <h1 className="font-display text-2xl font-semibold text-text">{tr("admin.pr.title")}</h1>
       </div>
       <p className="mt-2 text-[12.5px] text-muted">
-        Delivered to users who turned on “Promotions” in Settings. Appears in their notifications and, if they allowed
-        it, as a system notification.
+        {tr("admin.pr.help")}
       </p>
 
       <div className="mt-4 space-y-3">
-        <input className={`${field} h-11`} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} />
-        <textarea className={`${field} py-2.5`} rows={3} placeholder="Message (optional)" value={body} onChange={(e) => setBody(e.target.value)} maxLength={200} />
-        <input className={`${field} h-11`} placeholder="Opens page (optional, e.g. /title/my-show)" value={href} onChange={(e) => setHref(e.target.value)} />
+        <input className={`${field} h-11`} placeholder={tr("admin.pr.titlePh")} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} />
+        <textarea className={`${field} py-2.5`} rows={3} placeholder={tr("admin.pr.messagePh")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={200} />
+        <input className={`${field} h-11`} placeholder={tr("admin.pr.hrefPh")} value={href} onChange={(e) => setHref(e.target.value)} />
         {error && <p className="rounded-md bg-crimson-soft px-3 py-2 text-[13px] text-crimson">{error}</p>}
         {result && <p className="rounded-md bg-surface-raised px-3 py-2 text-[13px] text-text">{result}</p>}
         <Button className="w-full" disabled={busy || !title.trim()} onClick={send}>
-          {busy ? "Sending…" : "Send promotion"}
+          {busy ? tr("admin.pr.sending") : tr("admin.pr.title")}
         </Button>
       </div>
     </div>

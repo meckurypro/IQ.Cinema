@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { useI18n } from "@/hooks/useI18n";
 
 const supabase = createClient();
 const RADIUS = 26;
@@ -29,6 +30,7 @@ export function AdWatchSheet({
   onClose: () => void;
   onCredited: (coins: number) => void;
 }) {
+  const { t } = useI18n();
   const [phase, setPhase] = useState<"loading" | "playing" | "done" | "error">("loading");
   const [ad, setAd] = useState<{ title: string; cta_label: string | null; cta_url: string | null } | null>(
     null
@@ -47,7 +49,7 @@ export function AdWatchSheet({
     setCredited(0);
     supabase.rpc("start_ad_view", { p_task_key: taskKey }).then(({ data, error: rpcError }) => {
       if (rpcError || !data?.ok) {
-        setError(data?.error === "daily_cap_reached" ? "You've hit today's limit." : "Ads aren't available right now.");
+        setError(data?.error === "daily_cap_reached" ? t("ads.dailyLimit") : t("ads.unavailable"));
         setPhase("error");
         return;
       }
@@ -80,7 +82,7 @@ export function AdWatchSheet({
     if (phase === "playing" && remaining === 0 && viewIdRef.current) {
       supabase.rpc("complete_ad_view", { p_view_id: viewIdRef.current }).then(({ data, error: rpcError }) => {
         if (rpcError || !data?.ok) {
-          setError("Couldn't confirm the view. Try again.");
+          setError(t("ads.confirmFailed"));
           setPhase("error");
           return;
         }
@@ -95,7 +97,7 @@ export function AdWatchSheet({
   const progress = phase === "playing" ? (duration - remaining) / duration : phase === "done" ? 1 : 0;
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={ad?.title ?? "Watch to earn"}>
+    <BottomSheet open={open} onClose={onClose} title={ad?.title ?? t("ads.watchToEarn")}>
       <div className="flex flex-col items-center gap-4 px-5 py-6 text-center">
         {phase === "error" ? (
           <>
@@ -141,7 +143,7 @@ export function AdWatchSheet({
               </span>
             </div>
             <p className="text-[13px] text-muted">
-              {phase === "loading" ? "Loading…" : "Stay on this screen to earn your reward."}
+              {phase === "loading" ? t("common.loading") : t("ads.stayOnScreen")}
             </p>
           </>
         )}
