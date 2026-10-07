@@ -73,7 +73,15 @@ async function getTitle(param: string) {
     .select("default_free_episodes, default_episode_unlock_coins")
     .single();
 
-  return { title, episodes: episodes ?? [], settings };
+  // Artist / brand line for music videos and commercials. Fetched on its own and
+  // tolerantly so this page keeps working if the column isn't there yet.
+  let credit: string | null = null;
+  if (title.content_type === "music_video" || title.content_type === "commercial") {
+    const { data: c } = await supabase.from("titles").select("credit_name").eq("id", title.id).maybeSingle();
+    credit = (c as { credit_name?: string | null } | null)?.credit_name ?? null;
+  }
+
+  return { title, episodes: episodes ?? [], settings, credit };
 }
 
 export default async function TitlePage({ params }: { params: { id: string } }) {
@@ -81,7 +89,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
   if (!data) notFound();
   if (data.title.slug !== params.id) permanentRedirect(titlePath(data.title.slug));
 
-  const { title, episodes, settings } = data;
+  const { title, episodes, settings, credit } = data;
   const freeCount = title.free_episode_count ?? settings?.default_free_episodes ?? 4;
   const defaultCost = settings?.default_episode_unlock_coins ?? 30;
 
@@ -108,6 +116,7 @@ export default async function TitlePage({ params }: { params: { id: string } }) 
         <h1 className="font-display text-[22px] font-semibold leading-tight text-text desk:text-[36px]">
           {title.title}
         </h1>
+        {credit && <p className="mt-1 text-[15px] font-medium text-muted">{credit}</p>}
         <TitleMeta
           contentRating={title.content_rating}
           status={title.status}
