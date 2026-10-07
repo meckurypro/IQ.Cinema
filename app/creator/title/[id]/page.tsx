@@ -19,6 +19,9 @@ import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { TagPicker } from "@/components/creator/TagPicker";
 import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
+import { getTypeConfig, unitOf as unitOfType } from "@/lib/uploadTypes";
+import { checkImageFile } from "@/lib/upload/imageUpload";
+import { uploadErrorMessage } from "@/lib/upload/errorMessages";
 
 type TitleStatus =
   | "draft"
@@ -74,8 +77,9 @@ type EpisodeRow = {
   is_promo: boolean;
 };
 
-const unitOf = (contentType: string | undefined): "episode" | "part" =>
-  contentType === "one_part_film" ? "part" : "episode";
+// Shared with the upload wizard: films, music videos and commercials are a
+// single standalone video ("part"); series are numbered episodes.
+const unitOf = (contentType: string | undefined): "episode" | "part" => unitOfType(contentType);
 
 export default function ManageTitlePage() {
   const { t } = useI18n();
@@ -153,7 +157,15 @@ export default function ManageTitlePage() {
 
     let posterUrl = title.poster_url;
     if (editPosterFile && user) {
-      const path = `${user.id}/${crypto.randomUUID()}-${editPosterFile.name}`;
+      // Explain unsupported images (HEIC, >5 MB) up front instead of letting the
+      // bucket reject them with a cryptic error.
+      const problem = checkImageFile(editPosterFile);
+      if (problem) {
+        setError(uploadErrorMessage(problem, t));
+        setSavingDetails(false);
+        return;
+      }
+      const path = `${user.id}/${crypto.randomUUID()}-${editPosterFile.name.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
       const { error: upErr } = await supabase.storage.from("posters").upload(path, editPosterFile);
       if (upErr) {
         setError(translateRuntimeError(upErr.message, t));
@@ -352,7 +364,12 @@ export default function ManageTitlePage() {
             aria-label={t("library.category")}
             className="h-12 w-full rounded-md border border-border bg-bg px-4 text-[14px] text-text"
           >
-            {CATEGORIES.map((c) => (
+            {CATEGORIES.filter((c) => {
+              // Music videos / commercials have a fixed category; everything else
+              // chooses among the story categories.
+              const fixed = getTypeConfig(title.content_type).fixedCategory;
+              return fixed ? c.value === fixed : c.value !== "music" && c.value !== "commercial";
+            }).map((c) => (
               <option key={c.value} value={c.value}>
                 {t(c.labelKey)}
               </option>
@@ -396,7 +413,7 @@ export default function ManageTitlePage() {
             <Upload size={15} />
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => setEditPosterFile(e.target.files?.[0] ?? null)}
             />

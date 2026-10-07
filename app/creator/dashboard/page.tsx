@@ -225,6 +225,14 @@ export default function CreatorDashboardPage() {
                 {row.total_unique_views}
               </span>
             </Link>
+            {row.status === "draft" && (
+              <Link
+                href={`/creator/upload?titleId=${row.id}`}
+                className="mx-4 mb-3 -mt-1 inline-flex h-8 items-center rounded-md border border-pink/40 bg-pink/10 px-3 text-[12px] font-semibold text-pink transition-colors hover:bg-pink/15"
+              >
+                {t("upload.wiz.continueDraft")}
+              </Link>
+            )}
           </li>
         ))}
         {!titles.length && (
