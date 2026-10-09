@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.iqcinema.app",
+      "sha256_cert_fingerprints": [
+        "89:7E:A5:06:4A:56:D9:C1:49:4A:41:69:D9:E6:95:D6:D4:C2:96:10:04:BC:56:4C:D2:33:94:2B:54:6C:48:79"
+      ]
+    }
+  }
+]

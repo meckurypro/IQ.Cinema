@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/hooks/useI18n";
 import { translateRuntimeError } from "@/lib/i18n/runtimeErrors";
 import { Button } from "@/components/ui/Button";
+import { ReviewPreview } from "@/components/admin/ReviewPreview";
 import clsx from "clsx";
 
 type Tab =
@@ -441,6 +442,7 @@ export default function AdminPage() {
                   {t.profiles?.username ? ` · ${tr("admin.byUser", { u: t.profiles.username })}` : ""}
                 </p>
                 {t.synopsis && <p className="mt-1.5 text-[13px] text-muted">{t.synopsis}</p>}
+                <ReviewPreview titleId={t.id} posterUrl={t.poster_url} />
                 <div className="mt-3 flex gap-2">
                   <Button
                     size="sm"
